@@ -1,107 +1,73 @@
 package com.nova.bank.dto;
+import com.nova.bank.entities.*;
 
-import com.nova.bank.entities.CustomerStatus;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public class CustomerResponse {
+public record CustomerResponse(
 
-    private String customerId;
+        String customerId,
 
-    private String firstName;
+        Title title,
 
-    private String lastName;
+        String firstName,
 
-    private String email;
+        String middleName,
 
-    private String mobileNumber;
+        String lastName,
 
-    private LocalDate dateOfBirth;
+        LocalDate dateOfBirth,
 
-    private CustomerStatus status;
+        Gender gender,
 
-    private LocalDateTime createdAt;
+        String nationality,
 
-    private LocalDateTime updatedAt;
+        MaritalStatus maritalStatus,
 
-    public String getCustomerId() {
-        return customerId;
-    }
+        String email,
 
-    public CustomerResponse setCustomerId(String customerId) {
-        this.customerId = customerId;
-        return this;
-    }
+        String mobileNumber,
 
-    public String getFirstName() {
-        return firstName;
-    }
+        String alternateMobileNumber,
 
-    public CustomerResponse setFirstName(String firstName) {
-        this.firstName = firstName;
-        return this;
-    }
+        String permanentAddress,
 
-    public String getLastName() {
-        return lastName;
-    }
+        String permanentCity,
 
-    public CustomerResponse setLastName(String lastName) {
-        this.lastName = lastName;
-        return this;
-    }
+        String permanentState,
 
-    public String getEmail() {
-        return email;
-    }
+        String permanentCountry,
 
-    public CustomerResponse setEmail(String email) {
-        this.email = email;
-        return this;
-    }
+        String permanentPinCode,
 
-    public String getMobileNumber() {
-        return mobileNumber;
-    }
+        String communicationAddress,
 
-    public CustomerResponse setMobileNumber(String mobileNumber) {
-        this.mobileNumber = mobileNumber;
-        return this;
-    }
+        String communicationCity,
 
-    public LocalDate getDateOfBirth() {
-        return dateOfBirth;
-    }
+        String communicationState,
 
-    public CustomerResponse setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-        return this;
-    }
+        String communicationCountry,
 
-    public CustomerStatus getStatus() {
-        return status;
-    }
+        String communicationPinCode,
 
-    public CustomerResponse setStatus(CustomerStatus status) {
-        this.status = status;
-        return this;
-    }
+        EmploymentType employmentType,
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
+        String occupation,
 
-    public CustomerResponse setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-        return this;
-    }
+        String employerName,
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
+        BigDecimal annualIncome,
 
-    public CustomerResponse setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-        return this;
-    }
+        SourceOfIncome sourceOfIncome,
+
+        String language,
+
+        CustomerStatus status,
+
+        LocalDateTime createdAt,
+
+        LocalDateTime updatedAt
+)
+{
 }

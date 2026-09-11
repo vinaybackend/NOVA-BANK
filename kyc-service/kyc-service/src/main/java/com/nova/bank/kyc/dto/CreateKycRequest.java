@@ -1,6 +1,6 @@
 package com.nova.bank.kyc.dto;
 
-import com.nova.bank.kyc.entities.DocumentType;
+import com.nova.bank.kyc.entities.KycDocumentType;
 import com.nova.bank.kyc.entities.KycType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -16,7 +16,7 @@ public class CreateKycRequest {
     private KycType kycType;
 
     @NotNull(message = "Document type is required")
-    private DocumentType documentType;
+    private KycDocumentType kycDocumentType;
 
     @NotBlank(message = "Document number is required")
     @Size(max = 50, message = "Document number must not exceed 50 characters")
@@ -40,12 +40,12 @@ public class CreateKycRequest {
         return this;
     }
 
-    public DocumentType getDocumentType() {
-        return documentType;
+    public KycDocumentType getDocumentType() {
+        return kycDocumentType;
     }
 
-    public CreateKycRequest setDocumentType(DocumentType documentType) {
-        this.documentType = documentType;
+    public CreateKycRequest setDocumentType(KycDocumentType kycDocumentType) {
+        this.kycDocumentType = kycDocumentType;
         return this;
     }
 

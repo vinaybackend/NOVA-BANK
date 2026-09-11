@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 public class UpdateCustomerStatusRequest {
 
     @NotNull(message = "Customer status is required")
-    private CustomerStatus status;
+    public CustomerStatus status;
 
     public CustomerStatus getStatus() {
         return status;

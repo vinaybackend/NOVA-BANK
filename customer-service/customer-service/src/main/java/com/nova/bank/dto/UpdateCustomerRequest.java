@@ -1,82 +1,97 @@
 package com.nova.bank.dto;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Past;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import com.nova.bank.entities.EmploymentType;
+import com.nova.bank.entities.MaritalStatus;
+import com.nova.bank.entities.SourceOfIncome;
+import com.nova.bank.entities.Title;
+import jakarta.validation.constraints.*;
+import java.math.BigDecimal;
 
-import java.time.LocalDate;
+public record UpdateCustomerRequest(
 
-public class UpdateCustomerRequest {
+        Title title,
 
-    @NotBlank(message = "First name is required")
-    @Size(max = 50, message = "First name must not exceed 50 characters")
-    private String firstName;
+        @Size(max = 50, message = "First name must not exceed 50 characters")
+        String firstName,
 
-    @NotBlank(message = "Last name is required")
-    @Size(max = 50, message = "Last name must not exceed 50 characters")
-    private String lastName;
+        @Size(max = 50, message = "Middle name must not exceed 50 characters")
+        String middleName,
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
-    @Size(max = 100, message = "Email must not exceed 100 characters")
-    private String email;
+        @Size(max = 50, message = "Last name must not exceed 50 characters")
+        String lastName,
 
-    @NotBlank(message = "Mobile number is required")
-    @Pattern(
-            regexp = "^[0-9]{10,15}$",
-            message = "Mobile number must contain 10 to 15 digits"
-    )
-    private String mobileNumber;
+        @Size(max = 100, message = "Nationality must not exceed 100 characters")
+        String nationality,
 
-    @NotNull(message = "Date of birth is required")
-    @Past(message = "Date of birth must be in the past")
-    private LocalDate dateOfBirth;
+        MaritalStatus maritalStatus,
 
-    public String getFirstName() {
-        return firstName;
-    }
+        @Email(message = "Invalid email format")
+        @Size(max = 100, message = "Email must not exceed 100 characters")
+        String email,
 
-    public UpdateCustomerRequest setFirstName(String firstName) {
-        this.firstName = firstName;
-        return this;
-    }
+        @Pattern(
+                regexp = "^[0-9]{10,15}$",
+                message = "Mobile number must contain 10 to 15 digits"
+        )
+        String mobileNumber,
 
-    public String getLastName() {
-        return lastName;
-    }
+        @Pattern(
+                regexp = "^[0-9]{10,15}$",
+                message = "Alternate mobile number must contain 10 to 15 digits"
+        )
+        String alternateMobileNumber,
 
-    public UpdateCustomerRequest setLastName(String lastName) {
-        this.lastName = lastName;
-        return this;
-    }
+        @Size(max = 150, message = "Permanent address must not exceed 150 characters")
+        String permanentAddress,
 
-    public String getEmail() {
-        return email;
-    }
+        @Size(max = 100, message = "Permanent city must not exceed 100 characters")
+        String permanentCity,
 
-    public UpdateCustomerRequest setEmail(String email) {
-        this.email = email;
-        return this;
-    }
+        @Size(max = 100, message = "Permanent state must not exceed 100 characters")
+        String permanentState,
 
-    public String getMobileNumber() {
-        return mobileNumber;
-    }
+        @Size(max = 100, message = "Permanent country must not exceed 100 characters")
+        String permanentCountry,
 
-    public UpdateCustomerRequest setMobileNumber(String mobileNumber) {
-        this.mobileNumber = mobileNumber;
-        return this;
-    }
+        @Pattern(
+                regexp = "^[0-9]{4,10}$",
+                message = "Invalid permanent PIN code"
+        )
+        String permanentPinCode,
 
-    public LocalDate getDateOfBirth() {
-        return dateOfBirth;
-    }
+        @Size(max = 150, message = "Communication address must not exceed 150 characters")
+        String communicationAddress,
 
-    public UpdateCustomerRequest setDateOfBirth(LocalDate dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-        return this;
-    }
+        @Size(max = 100, message = "Communication city must not exceed 100 characters")
+        String communicationCity,
+
+        @Size(max = 100, message = "Communication state must not exceed 100 characters")
+        String communicationState,
+
+        @Size(max = 100, message = "Communication country must not exceed 100 characters")
+        String communicationCountry,
+
+        @Pattern(
+                regexp = "^[0-9]{4,10}$",
+                message = "Invalid communication PIN code"
+        )
+        String communicationPinCode,
+
+        EmploymentType employmentType,
+
+        @Size(max = 100, message = "Occupation must not exceed 100 characters")
+        String occupation,
+
+        @Size(max = 150, message = "Employer name must not exceed 150 characters")
+        String employerName,
+
+        @DecimalMin(value = "0.0", inclusive = true, message = "Annual income cannot be negative")
+        @Digits(integer = 17, fraction = 2, message = "Invalid annual income")
+        BigDecimal annualIncome,
+
+        SourceOfIncome sourceOfIncome,
+
+        @Size(max = 30, message = "Language must not exceed 30 characters")
+        String language
+) {
 }

@@ -1,15 +1,13 @@
 package com.nova.bank.kyc.services;
 
 import com.nova.bank.kyc.clients.CustomerClient;
-import com.nova.bank.kyc.clients.CustomerResponse;
-import com.nova.bank.kyc.dto.CreateKycRequest;
-import com.nova.bank.kyc.dto.KycResponse;
-import com.nova.bank.kyc.dto.RejectKycRequest;
-import com.nova.bank.kyc.dto.ReviewKycRequest;
+import com.nova.bank.kyc.dto.*;
 import com.nova.bank.kyc.entities.Kyc;
-import com.nova.bank.kyc.entities.VerificationStatus;
+import com.nova.bank.kyc.entities.KycVerificationStatus;
 import com.nova.bank.kyc.exceptions.*;
 import com.nova.bank.kyc.repositories.KycRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 import feign.FeignException;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,7 +55,7 @@ public class KycService {
                 .kycType(request.getKycType())
                 .documentType(request.getDocumentType())
                 .documentNumber(request.getDocumentNumber())
-                .verificationStatus(VerificationStatus.PENDING)
+                .verificationStatus(KycVerificationStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -82,9 +80,9 @@ public class KycService {
                 .kycId(kyc.getKycId())
                 .customerId(kyc.getCustomerId())
                 .kycType(kyc.getKycType())
-                .documentType(kyc.getDocumentType())
+                .kycDocumentType(kyc.getDocumentType())
                 .documentNumber(kyc.getDocumentNumber())
-                .verificationStatus(kyc.getVerificationStatus())
+                .kycVerificationStatus(kyc.getVerificationStatus())
                 .reviewerId(kyc.getReviewerId())
                 .verifiedAt(kyc.getVerifiedAt())
                 .rejectionReason(kyc.getRejectionReason())
@@ -110,16 +108,25 @@ public class KycService {
     }
 
     @Transactional
-    public KycResponse reviewKyc(String kycId, ReviewKycRequest request) {
+    public KycResponse reviewKyc(String kycId, Authentication authentication) {
 
         Kyc kyc = kycRepository.findByKycId(kycId).orElseThrow(() -> new KycNotFoundException("KYC not found: " + kycId));
 
-        if (kyc.getVerificationStatus() != VerificationStatus.PENDING) {
+        if (kyc.getVerificationStatus() != KycVerificationStatus.PENDING) {
+
             throw new InvalidKycStatusException("KYC can be moved to UNDER_REVIEW only from PENDING status");
         }
-        kyc.setVerificationStatus(VerificationStatus.UNDER_REVIEW);
-        kyc.setReviewerId(request.getReviewerId());
+        JwtAuthenticationToken jwtAuthenticationToken = (JwtAuthenticationToken) authentication;
+
+        String reviewerId = jwtAuthenticationToken.getToken().getSubject();
+
+        String reviewerName = jwtAuthenticationToken.getToken().getClaimAsString("name");
+        kyc.setReviewerId(reviewerId);
+        kyc.setReviewerName(reviewerName);
+        kyc.setVerificationStatus(KycVerificationStatus.UNDER_REVIEW);
+
         kyc.setUpdatedAt(LocalDateTime.now());
+
         Kyc updatedKyc = kycRepository.save(kyc);
 
         return mapToResponse(updatedKyc);
@@ -133,11 +140,11 @@ public class KycService {
 
         Kyc kyc = kycRepository.findByKycId(kycId).orElseThrow(() -> new KycNotFoundException("KYC not found: " + kycId));
 
-        if (kyc.getVerificationStatus() != VerificationStatus.UNDER_REVIEW) {
+        if (kyc.getVerificationStatus() != KycVerificationStatus.UNDER_REVIEW) {
             throw new InvalidKycStatusException("KYC can be moved to UNDER_REVIEW only from PENDING status");
         }
 
-        kyc.setVerificationStatus(VerificationStatus.REJECTED);
+        kyc.setVerificationStatus(KycVerificationStatus.REJECTED);
         kyc.setRejectionReason(request.getRejectionReason());
         kyc.setUpdatedAt(LocalDateTime.now());
 
@@ -153,16 +160,45 @@ public class KycService {
 
         Kyc kyc = kycRepository.findByKycId(kycId).orElseThrow(() -> new KycNotFoundException("KYC not found: " + kycId));
 
-        if (kyc.getVerificationStatus() != VerificationStatus.UNDER_REVIEW) {
+        if (kyc.getVerificationStatus() != KycVerificationStatus.UNDER_REVIEW) {
             throw new InvalidKycStatusException("KYC can be approved only from UNDER_REVIEW status");
         }
 
-        kyc.setVerificationStatus(VerificationStatus.APPROVED);
+        kyc.setVerificationStatus(KycVerificationStatus.APPROVED);
         kyc.setVerifiedAt(LocalDateTime.now());
         kyc.setUpdatedAt(LocalDateTime.now());
 
         Kyc updatedKyc = kycRepository.save(kyc);
+        if(updatedKyc.getVerificationStatus().equals(KycVerificationStatus.APPROVED)){
+            customerClient.customerStatusUpdated(updatedKyc.getCustomerId());
+        }
 
         return mapToResponse(updatedKyc);
     }
+
+    @Transactional(readOnly = true)
+    public KycStatusResponse getKycStatusByCustomerId(String customerId) {
+
+        Kyc kyc = kycRepository.findByCustomerId(customerId).orElseThrow(() -> new KycNotFoundException("KYC not found for customer: " + customerId));
+
+        return new KycStatusResponse(kyc.getCustomerId(), kyc.getVerificationStatus().name());
+    }
+//
+//    @Transactional
+//    public KycResponse submitKyc(String kycId) {
+//
+//        Kyc kyc = kycRepository.findByKycId(kycId).orElseThrow(() -> new RuntimeException("KYC not found: " + kycId));
+//
+//        // KYC can be submitted only from DRAFT
+//        if (kyc.getVerificationStatus() != KycVerificationStatus.PENDING) {
+//
+//            throw new RuntimeException("KYC cannot be submitted from status: " + kyc.getVerificationStatus());
+//        }
+//
+//        kyc.setVerificationStatus(KycVerificationStatus.SUBMITTED);
+//
+//        Kyc submittedKyc = kycRepository.save(kyc);
+//
+//        return mapToResponse(submittedKyc);
+//    }
 }

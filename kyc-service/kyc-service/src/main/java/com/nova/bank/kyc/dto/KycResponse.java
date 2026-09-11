@@ -1,8 +1,8 @@
 package com.nova.bank.kyc.dto;
 
-import com.nova.bank.kyc.entities.DocumentType;
+import com.nova.bank.kyc.entities.KycDocumentType;
 import com.nova.bank.kyc.entities.KycType;
-import com.nova.bank.kyc.entities.VerificationStatus;
+import com.nova.bank.kyc.entities.KycVerificationStatus;
 import lombok.Builder;
 
 import java.time.LocalDateTime;
@@ -15,11 +15,11 @@ public class KycResponse {
 
     private KycType kycType;
 
-    private DocumentType documentType;
+    private KycDocumentType kycDocumentType;
 
     private String documentNumber;
 
-    private VerificationStatus verificationStatus;
+    private KycVerificationStatus kycVerificationStatus;
 
     private LocalDateTime verifiedAt;
 
@@ -39,6 +39,17 @@ public class KycResponse {
     }
 
     private String reviewerId;
+
+    public String getReviewerName() {
+        return reviewerName;
+    }
+
+    public KycResponse setReviewerName(String reviewerName) {
+        this.reviewerName = reviewerName;
+        return this;
+    }
+
+    private String reviewerName;
 
     public String getKycId() {
         return kycId;
@@ -67,12 +78,12 @@ public class KycResponse {
         return this;
     }
 
-    public DocumentType getDocumentType() {
-        return documentType;
+    public KycDocumentType getKycDocumentType() {
+        return kycDocumentType;
     }
 
-    public KycResponse setDocumentType(DocumentType documentType) {
-        this.documentType = documentType;
+    public KycResponse setKycDocumentType(KycDocumentType kycDocumentType) {
+        this.kycDocumentType = kycDocumentType;
         return this;
     }
 
@@ -85,12 +96,12 @@ public class KycResponse {
         return this;
     }
 
-    public VerificationStatus getVerificationStatus() {
-        return verificationStatus;
+    public KycVerificationStatus getKycVerificationStatus() {
+        return kycVerificationStatus;
     }
 
-    public KycResponse setVerificationStatus(VerificationStatus verificationStatus) {
-        this.verificationStatus = verificationStatus;
+    public KycResponse setKycVerificationStatus(KycVerificationStatus kycVerificationStatus) {
+        this.kycVerificationStatus = kycVerificationStatus;
         return this;
     }
 

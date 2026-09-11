@@ -51,4 +51,12 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+
+    @ExceptionHandler(KycNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleKycNotFound(KycNotFoundException ex, HttpServletRequest request) {
+
+        ErrorResponse response = new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "KYC Not Found", ex.getMessage(), request.getRequestURI());
+
+        return ResponseEntity.badRequest().body(response);
+    }
 }

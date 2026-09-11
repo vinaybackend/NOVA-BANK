@@ -1,14 +1,12 @@
 package com.nova.bank.kyc.controllers;
 
-import com.nova.bank.kyc.dto.CreateKycRequest;
-import com.nova.bank.kyc.dto.KycResponse;
-import com.nova.bank.kyc.dto.RejectKycRequest;
-import com.nova.bank.kyc.dto.ReviewKycRequest;
+import com.nova.bank.kyc.dto.*;
 import com.nova.bank.kyc.services.KycService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -26,8 +24,8 @@ public class KycController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/searchByCustomerId/{kycId}")
-    public ResponseEntity<KycResponse> getKycById(@PathVariable String kycId) {
+    @GetMapping("/search/{kycId}")
+    public ResponseEntity<KycResponse> getKycByKycId(@PathVariable String kycId) {
 
         KycResponse response = kycService.getKycById(kycId);
 
@@ -43,9 +41,9 @@ public class KycController {
     }
 
     @PatchMapping("/review/{kycId}")
-    public ResponseEntity<KycResponse> reviewKyc(@PathVariable String kycId, @Valid @RequestBody ReviewKycRequest request) {
+    public ResponseEntity<KycResponse> reviewKyc(@PathVariable String kycId, Authentication authentication) {
 
-        KycResponse response = kycService.reviewKyc(kycId, request);
+        KycResponse response = kycService.reviewKyc(kycId,authentication);
 
         return ResponseEntity.ok(response);
     }
@@ -68,4 +66,17 @@ public class KycController {
 
         return ResponseEntity.ok(response);
     }
+    @GetMapping("/status/{customerId}")
+    public KycStatusResponse getKycStatus(@PathVariable String customerId){
+        KycStatusResponse kycStatusByCustomerId = kycService.getKycStatusByCustomerId(customerId);
+        return kycStatusByCustomerId;
+    }
+//
+//    @PatchMapping("/submit/{kycId}")
+//    public ResponseEntity<KycResponse> submitKyc(@PathVariable String kycId) {
+//
+//        KycResponse response = kycService.submitKyc(kycId);
+//
+//        return ResponseEntity.ok(response);
+//    }
 }
