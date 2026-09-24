@@ -1,73 +1,73 @@
 package com.nova.bank.dto;
 import com.nova.bank.entities.*;
-
+import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public record CustomerResponse(
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class CustomerResponse {
 
-        String customerId,
+    private String customerId;
 
-        Title title,
+    private Title title;
 
-        String firstName,
+    private String firstName;
 
-        String middleName,
+    private String middleName;
 
-        String lastName,
+    private String lastName;
 
-        LocalDate dateOfBirth,
+    private LocalDate dateOfBirth;
 
-        Gender gender,
+    private Gender gender;
 
-        String nationality,
+    private String nationality;
 
-        MaritalStatus maritalStatus,
+    private MaritalStatus maritalStatus;
 
-        String email,
+    private String email;
 
-        String mobileNumber,
+    private String mobileNumber;
 
-        String alternateMobileNumber,
+    private String alternateMobileNumber;
 
-        String permanentAddress,
+    private String permanentAddress;
 
-        String permanentCity,
+    private String permanentCity;
 
-        String permanentState,
+    private String permanentState;
 
-        String permanentCountry,
+    private String permanentCountry;
 
-        String permanentPinCode,
+    private String permanentPinCode;
 
-        String communicationAddress,
+    private String communicationAddress;
 
-        String communicationCity,
+    private String communicationCity;
 
-        String communicationState,
+    private String communicationState;
 
-        String communicationCountry,
+    private String communicationCountry;
 
-        String communicationPinCode,
+    private String communicationPinCode;
 
-        EmploymentType employmentType,
+    private String occupation;
 
-        String occupation,
+    private BigDecimal annualIncome;
 
-        String employerName,
+    private SourceOfIncome sourceOfIncome;
 
-        BigDecimal annualIncome,
+    private String language;
 
-        SourceOfIncome sourceOfIncome,
+    private CustomerStatus status;
 
-        String language,
+    private LocalDateTime createdAt;
 
-        CustomerStatus status,
-
-        LocalDateTime createdAt,
-
-        LocalDateTime updatedAt
-)
-{
+    private LocalDateTime updatedAt;
+    private KycResponse kycResponse;
 }

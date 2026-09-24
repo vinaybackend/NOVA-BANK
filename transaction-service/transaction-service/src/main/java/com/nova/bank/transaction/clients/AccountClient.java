@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 
-@FeignClient(name = "account-service")
+@FeignClient(name = "account-service",configuration = FeignClientConfig.class)
 public interface AccountClient {
 
     @GetMapping("/api/v1/accounts/account-number/{accountNumber}")

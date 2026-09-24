@@ -56,4 +56,14 @@ public class Account {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "branch_id", nullable = false, length = 30)
+    private String branchId;
+
+    @Column(name = "branch_name", nullable = false, length = 150)
+    private String branchName;
+
+    @Column(name = "ifsc", nullable = false, length = 11)
+    private String ifsc;
+
 }

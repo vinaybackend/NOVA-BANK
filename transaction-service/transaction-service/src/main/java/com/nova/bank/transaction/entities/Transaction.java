@@ -29,8 +29,14 @@ public class Transaction {
     @Column(name = "transaction_id", nullable = false, unique = true, length = 40)
     private String transactionId;
 
-    @Column(name = "account_number", nullable = false, length = 20)
+    @Column(name = "account_number", length = 20)
     private String accountNumber;
+
+    @Column(name = "from_account_number",length = 20)
+    private String fromAccountNumber;
+
+    @Column(name = "to_account_number", length = 20)
+    private String toAccountNumber;
 
     @Column(name = "customer_id", nullable = false, length = 30)
     private String customerId;

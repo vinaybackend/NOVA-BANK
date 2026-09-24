@@ -1,13 +1,11 @@
 package com.nova.bank.transaction.services;
 
 import com.nova.bank.transaction.clients.AccountClient;
-import com.nova.bank.transaction.dto.AccountResponse;
-import com.nova.bank.transaction.dto.CreateDepositRequest;
-import com.nova.bank.transaction.dto.CreateWithdrawalRequest;
-import com.nova.bank.transaction.dto.TransactionResponse;
+import com.nova.bank.transaction.dto.*;
 import com.nova.bank.transaction.entities.Transaction;
 import com.nova.bank.transaction.entities.TransactionStatus;
 import com.nova.bank.transaction.entities.TransactionType;
+import com.nova.bank.transaction.exceptions.InsufficientBalanceException;
 import com.nova.bank.transaction.repositories.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,27 +26,27 @@ public class TransactionService {
     @Transactional
     public TransactionResponse deposit(CreateDepositRequest request) {
 
-        // 1. Get account
+        // Get account
         AccountResponse account = accountClient.getAccountByNumber(request.getAccountNumber());
 
-        // 2. Validate currency
+        // Validate currency
         if (!account.getCurrency().equalsIgnoreCase(request.getCurrency())) {
 
             throw new IllegalArgumentException("Transaction currency does not match account currency");
         }
 
-        // 3. Create transaction ID
+        // Create transaction ID
         String transactionId = generateTransactionId();
 
-        // 4. Create reference
+        //Create reference
         String reference = generateReference();
 
         LocalDateTime now = LocalDateTime.now();
 
-        // 5. Credit account
+        // Credit account
         accountClient.creditAccount(request.getAccountNumber(), request.getAmount());
 
-        // 6. Create successful transaction record
+        // Create successful transaction record
         Transaction transaction = Transaction.builder()
                 .transactionId(transactionId)
                 .accountNumber(account.getAccountNumber())
@@ -134,6 +132,63 @@ public class TransactionService {
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
+        return mapToResponse(savedTransaction);
+    }
+
+    @Transactional
+    public TransactionResponse transfer(CreateTransferRequest request) {
+
+        // Source and destination cannot be same
+        if (request.getFromAccountNumber().equals(request.getToAccountNumber())) {
+
+            throw new InsufficientBalanceException("Source and destination accounts cannot be the same");
+        }
+
+        // Get source account
+        AccountResponse sourceAccount = accountClient.getAccountByNumber(request.getFromAccountNumber());
+
+        // Get destination account
+        AccountResponse destinationAccount = accountClient.getAccountByNumber(request.getToAccountNumber());
+
+        // Check currency
+        if (!sourceAccount.getCurrency().equalsIgnoreCase(destinationAccount.getCurrency())) {
+
+            throw new IllegalArgumentException("Source and destination account currencies do not match");
+        }
+
+        // Check requested currency
+        if (!sourceAccount.getCurrency().equalsIgnoreCase(request.getCurrency())) {
+
+            throw new IllegalArgumentException("Transaction currency does not match account currency");
+        }
+
+        // Debit source account
+        accountClient.debitAccount(request.getFromAccountNumber(), request.getAmount());
+
+        // Credit destination account
+        accountClient.creditAccount(request.getToAccountNumber(), request.getAmount());
+
+        // Create transaction
+        LocalDateTime now = LocalDateTime.now();
+
+        Transaction transaction = Transaction.builder()
+                .transactionId(generateTransactionId())
+                .fromAccountNumber(sourceAccount.getAccountNumber())
+                .toAccountNumber(destinationAccount.getAccountNumber())
+                .customerId(sourceAccount.getCustomerId())
+                .transactionType(TransactionType.TRANSFER)
+                .amount(request.getAmount())
+                .currency(sourceAccount.getCurrency())
+                .transactionStatus(TransactionStatus.SUCCESS)
+                .reference(generateReference())
+                .description(request.getDescription())
+                .createdAt(now).updatedAt(now)
+                .build();
+
+        // Save transaction
+        Transaction savedTransaction = transactionRepository.save(transaction);
+
+        //  Return response
         return mapToResponse(savedTransaction);
     }
 }

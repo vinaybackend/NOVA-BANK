@@ -21,4 +21,11 @@ public class CreateAccountRequest {
     @NotBlank(message = "Currency is required")
     @Size(min = 3, max = 3, message = "Currency must be a 3-letter code")
     private String currency;
+
+    @NotBlank(message = "Branch ID is required")
+    @Size(max = 30, message = "Branch ID must not exceed 30 characters")
+    private String branchId;
+
+    @jakarta.validation.Valid
+    private CreateNomineeRequest nominee;
 }

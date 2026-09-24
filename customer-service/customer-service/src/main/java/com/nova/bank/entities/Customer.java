@@ -1,19 +1,19 @@
-package com.nova.bank.entities;
-import jakarta.persistence.*;
-import lombok.*;
+    package com.nova.bank.entities;
+    import jakarta.persistence.*;
+    import lombok.*;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+    import java.math.BigDecimal;
+    import java.time.LocalDate;
+    import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "customers", uniqueConstraints = @UniqueConstraint(name = "uk_customer_customer_id", columnNames = "customer_id"))
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Customer {
+    @Entity
+    @Table(name = "customers", uniqueConstraints = @UniqueConstraint(name = "uk_customer_customer_id", columnNames = "customer_id"))
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public class Customer {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -90,15 +90,8 @@ public class Customer {
     private String communicationPinCode;
 
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "employment_type", length = 30)
-    private EmploymentType employmentType;
-
     @Column(name = "occupation", length = 100)
     private String occupation;
-
-    @Column(name = "employer_name", length = 150)
-    private String employerName;
 
     @Column(name = "annual_income", precision = 19, scale = 2)
     private BigDecimal annualIncome;

@@ -1,15 +1,13 @@
 package com.nova.bank.account.services;
 
-import com.nova.bank.account.clients.KycClient;
-import com.nova.bank.account.dto.AccountResponse;
-import com.nova.bank.account.dto.CreateAccountRequest;
-import com.nova.bank.account.dto.KycResponse;
-import com.nova.bank.account.dto.UpdateAccountStatusRequest;
-import com.nova.bank.account.entities.Account;
-import com.nova.bank.account.entities.AccountStatus;
-import com.nova.bank.account.entities.VerificationStatus;
+import com.nova.bank.account.clients.CustomerClient;
+import com.nova.bank.account.dto.*;
+import com.nova.bank.account.entities.*;
 import com.nova.bank.account.exceptions.*;
+import com.nova.bank.account.repositories.AccountHolderRepository;
+import com.nova.bank.account.repositories.AccountNomineeRepository;
 import com.nova.bank.account.repositories.AccountRepository;
+import com.nova.bank.account.repositories.BranchRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,40 +18,60 @@ import java.util.UUID;
 
 @Service
 public class AccountService {
-
+    private final CustomerClient customerClient;
+    private final BranchRepository branchRepository;
+    private final AccountHolderRepository accountHolderRepository;
     private final AccountRepository accountRepository;
-    private final KycClient kycClient;
+    private final AccountNomineeRepository accountNomineeRepository;
 
-    public AccountService(AccountRepository accountRepository, KycClient kycClient) {
+    public AccountService(CustomerClient customerClient, BranchRepository branchRepository, AccountHolderRepository accountHolderRepository, AccountRepository accountRepository, AccountNomineeRepository accountNomineeRepository) {
+        this.customerClient = customerClient;
+        this.branchRepository = branchRepository;
+        this.accountHolderRepository = accountHolderRepository;
         this.accountRepository = accountRepository;
-        this.kycClient = kycClient;
+        this.accountNomineeRepository = accountNomineeRepository;
     }
 
     @Transactional
     public AccountResponse createAccount(CreateAccountRequest request) {
 
-        // Step 1: Check KYC
-        KycResponse kyc = kycClient.getKycByCustomerId(request.getCustomerId());
+        //Check customer + KYC eligibility
+        CustomerEligibilityResponse eligibility = customerClient.getAccountEligibility(request.getCustomerId());
 
-        // Step 2: KYC must be approved
-        if (kyc.getVerificationStatus() != VerificationStatus.APPROVED) {
+        if (!eligibility.isEligible()) {
 
-            throw new KycNotApprovedException("Customer KYC is not approved");
+            throw new IllegalStateException("Customer is not eligible for account opening. " + "Customer status: " + eligibility.getCustomerStatus() + ", KYC status: " + eligibility.getKycStatus());
         }
 
-        // Step 3: Prevent duplicate account type
+        // Check whether account already exists
         if (accountRepository.existsByCustomerIdAndAccountType(request.getCustomerId(), request.getAccountType())) {
 
-            throw new AccountAlreadyExistsException("Account already exists for customer: " + request.getCustomerId());
+            throw new AccountAlreadyExistsException("Account already exists for customer: " + request.getCustomerId() + " with type: " + request.getAccountType());
         }
 
-        // Step 4: Create account
+        // Validate branch
+        Branch branch = branchRepository.findByBranchId(request.getBranchId()).orElseThrow(() -> new IllegalArgumentException("Branch not found: " + request.getBranchId()));
+
+        // Branch must be ACTIVE
+        if (branch.getStatus() != BranchStatus.ACTIVE) {
+
+            throw new IllegalStateException("Account cannot be opened because branch is " + branch.getStatus());
+        }
+
+        // Generate identifiers
+        String accountId = generateAccountId();
+        String accountNumber = generateAccountNumber();
+
         LocalDateTime now = LocalDateTime.now();
 
+        //Create Account
         Account account = Account.builder()
-                .accountId(generateAccountId())
-                .accountNumber(generateAccountNumber())
+                .accountId(accountId)
+                .accountNumber(accountNumber)
                 .customerId(request.getCustomerId())
+                .branchId(branch.getBranchId())
+                .branchName(branch.getBranchName())
+                .ifsc(branch.getIfsc())
                 .accountType(request.getAccountType())
                 .accountStatus(AccountStatus.ACTIVE)
                 .balance(BigDecimal.ZERO)
@@ -62,11 +80,88 @@ public class AccountService {
                 .updatedAt(now)
                 .build();
 
-        // Step 5: Save
         Account savedAccount = accountRepository.save(account);
 
-        // Step 6: Return response
+        // 7. Create PRIMARY Account Holder
+        AccountHolder primaryHolder = AccountHolder.builder()
+                .accountId(savedAccount.getAccountId())
+                .customerId(savedAccount.getCustomerId())
+                .holderType(AccountHolderType.PRIMARY)
+                .addedAt(now)
+                .build();
+
+        accountHolderRepository.save(primaryHolder);
+
+        // 8. Create Nominee
+        if (request.getNominee() != null) {
+
+            CreateNomineeRequest nomineeRequest = request.getNominee();
+
+            AccountNominee nominee = AccountNominee.builder()
+                    .nomineeId(generateNomineeId())
+                    .accountId(savedAccount.getAccountId())
+                    .fullName(nomineeRequest.getFullName())
+                    .relationship(nomineeRequest.getRelationship())
+                    .dateOfBirth(nomineeRequest.getDateOfBirth())
+                    .mobileNumber(nomineeRequest.getMobileNumber())
+                    .address(nomineeRequest.getAddress())
+                    .active(true)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+
+            accountNomineeRepository.save(nominee);
+        }
+
+        // 9. Return Account response
         return mapToResponse(savedAccount);
+    }
+    private String generateNomineeId() {
+
+        return "NOM-" +
+                UUID.randomUUID()
+                        .toString()
+                        .replace("-", "")
+                        .substring(0, 10)
+                        .toUpperCase();
+    }
+    private AccountResponse mapToResponse(Account account) {
+
+        AccountNominee nominee = accountNomineeRepository.findByAccountIdAndActiveTrue(account.getAccountId()).orElse(null);
+
+        NomineeResponse nomineeResponse = null;
+
+        if (nominee != null) {
+
+            nomineeResponse = NomineeResponse.builder()
+                    .nomineeId(nominee.getNomineeId())
+                    .accountId(nominee.getAccountId())
+                    .fullName(nominee.getFullName())
+                    .relationship(nominee.getRelationship())
+                    .dateOfBirth(nominee.getDateOfBirth())
+                    .mobileNumber(nominee.getMobileNumber())
+                    .address(nominee.getAddress())
+                    .active(nominee.getActive())
+                    .createdAt(nominee.getCreatedAt())
+                    .updatedAt(nominee.getUpdatedAt())
+                    .build();
+        }
+
+        return AccountResponse.builder()
+                .accountId(account.getAccountId())
+                .accountNumber(account.getAccountNumber())
+                .customerId(account.getCustomerId())
+                .accountType(account.getAccountType())
+                .accountStatus(account.getAccountStatus())
+                .balance(account.getBalance())
+                .branchId(account.getBranchId())
+                .branchName(account.getBranchName())
+                .ifsc(account.getIfsc())
+                .currency(account.getCurrency())
+                .nominee(nomineeResponse)
+                .createdAt(account.getCreatedAt())
+                .updatedAt(account.getUpdatedAt())
+                .build();
     }
 
     private String generateAccountId() {
@@ -81,26 +176,11 @@ public class AccountService {
 
     private String generateAccountNumber() {
 
-        long number = 1000000000L + (long) (Math.random() * 9000000000L);
+        long number = 1000000000L
+                + (long) (Math.random() * 9000000000L);
 
         return String.valueOf(number);
     }
-
-    private AccountResponse mapToResponse(Account account) {
-
-        return AccountResponse.builder()
-                .accountId(account.getAccountId())
-                .accountNumber(account.getAccountNumber())
-                .customerId(account.getCustomerId())
-                .accountType(account.getAccountType())
-                .accountStatus(account.getAccountStatus())
-                .balance(account.getBalance())
-                .currency(account.getCurrency())
-                .createdAt(account.getCreatedAt())
-                .updatedAt(account.getUpdatedAt())
-                .build();
-    }
-
 
     @Transactional(readOnly = true)
     public AccountResponse getAccountById(String accountId) {
@@ -222,5 +302,6 @@ public class AccountService {
             throw new IllegalStateException("Account is not active");
         }
     }
+
     }
 

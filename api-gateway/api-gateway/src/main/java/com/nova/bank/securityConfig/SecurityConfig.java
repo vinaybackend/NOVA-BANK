@@ -1,10 +1,9 @@
 package com.nova.bank.securityConfig;
-
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
@@ -25,8 +24,14 @@ public class SecurityConfig {
         security.cors(Customizer.withDefaults())
                 .csrf(csrfSpec -> csrfSpec.disable())
                 .authorizeExchange(exchange->exchange
-                        .pathMatchers("/actuator/**").permitAll()
-                        .pathMatchers(HttpMethod.GET).hasRole("BANK_EMPLOYEE")
+                        .pathMatchers("/actuator/**",
+                                "/auth-service/api/v1/auth/register",
+                                "/auth-service/api/v1/auth/login",
+                                "/auth-service/api/v1/admin/auth/login",
+                                "/auth-service/api/v1/auth/refresh-token",
+                                "/auth-service/api/v1/admin/auth/refresh-token")
+                        .permitAll()
+                        .pathMatchers("/auth-service/api/v1/admin/auth/**").hasRole("ADMIN")
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(config->config.jwt(jwtSpec -> jwtSpec.jwtAuthenticationConverter(roleExtract())));
         return security.build();
@@ -37,5 +42,6 @@ public class SecurityConfig {
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(roleConverter);
         return new ReactiveJwtAuthenticationConverterAdapter(jwtAuthenticationConverter);
     }
+
 }
 

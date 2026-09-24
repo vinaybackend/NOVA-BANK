@@ -1,15 +1,12 @@
 package com.nova.bank.services;
-import com.nova.bank.clients.KycClient;
-import com.nova.bank.clients.KycStatusResponse;
+
+import com.nova.bank.config.AppConstant;
 import com.nova.bank.dto.*;
-import com.nova.bank.entities.Customer;
-import com.nova.bank.entities.CustomerStatus;
-import com.nova.bank.exception.CustomerAlreadyExistsException;
-import com.nova.bank.exception.CustomerNotFoundException;
-import com.nova.bank.exception.InvalidCustomerStatusTransitionException;
-import com.nova.bank.exception.KycNotFoundException;
+import com.nova.bank.entities.*;
+import com.nova.bank.exception.*;
 import com.nova.bank.repositories.CustomerRepository;
-import feign.FeignException;
+import com.nova.bank.repositories.KycDocumentRepository;
+import com.nova.bank.repositories.KycRepository;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -17,6 +14,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -24,59 +29,206 @@ import java.util.UUID;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final KycClient kycClient;
+    private final KycRepository kycRepository;
+    private final KycDocumentRepository kycDocumentRepository;
+
+    private final Path folderPath = Paths.get("uploads", "kyc");
 
     @Transactional
-    public CustomerResponse createCustomer(CreateCustomerRequest request) {
-        // 1. Check duplicate email
-        if (request.email() != null && customerRepository.existsByEmail(request.email())) {
-            throw new IllegalStateException("Customer with email already exists");
+    public CustomerResponse createCustomer(CustomerOnboardingRequest request, List<MultipartFile> files) throws IOException {
+
+        // 1. Validate duplicate customer
+        validateDuplicateCustomer(request);
+
+        // 2. Validate KYC
+        if (request.getKyc() == null) {
+            throw new IllegalArgumentException("KYC information is required");
         }
-        // 2. Check duplicate mobile number
-        if (request.mobileNumber() != null && customerRepository.existsByMobileNumber(request.mobileNumber())) {
-            throw new IllegalStateException("Customer with mobile number already exists");
+
+        if (request.getKyc().getDocuments() == null || request.getKyc().getDocuments().isEmpty()) {
+
+            throw new IllegalArgumentException("At least one KYC document is required");
         }
-        // 3. Create Customer entity
-        Customer customer = Customer.builder()
-                .customerId(generateCustomerId())
-                .title(request.title())
-                .firstName(request.firstName())
-                .middleName(request.middleName())
-                .lastName(request.lastName())
-                .dateOfBirth(request.dateOfBirth())
-                .gender(request.gender())
-                .nationality(request.nationality())
-                .maritalStatus(request.maritalStatus())
-                .email(request.email())
-                .mobileNumber(request.mobileNumber())
-                .alternateMobileNumber(request.alternateMobileNumber())
-                .permanentAddress(request.permanentAddress())
-                .permanentCity(request.permanentCity())
-                .permanentState(request.permanentState())
-                .permanentCountry(request.permanentCountry())
-                .permanentPinCode(request.permanentPinCode())
-                .communicationAddress(request.communicationAddress())
-                .communicationCity(request.communicationCity())
-                .communicationState(request.communicationState())
-                .communicationCountry(request.communicationCountry())
-                .communicationPinCode(request.communicationPinCode())
-                .employmentType(request.employmentType())
-                .occupation(request.occupation())
-                .employerName(request.employerName())
-                .annualIncome(request.annualIncome())
-                .sourceOfIncome(request.sourceOfIncome())
-                .language(request.language())
-                .build();
+
+        // 3. Validate uploaded files
+        if (files == null || files.size() != request.getKyc().getDocuments().size()) {
+
+            throw new IllegalArgumentException("Number of uploaded files must match number of KYC documents");
+        }
+
+        // 4. Check duplicate document numbers
+        for (KycDocumentRequest documentRequest : request.getKyc().getDocuments()) {
+
+            if (kycDocumentRepository.existsByDocumentNumber(documentRequest.getDocumentNumber())) {
+
+                throw new DuplicateDocumentException("Document is already registered: " + documentRequest.getDocumentType());
+            }
+        }
+
+        // 5. Generate customer ID
+        String customerId = generateCustomerId();
+
+        // 6. Create Customer
+        Customer customer = Customer.builder().customerId(customerId).title(request.getTitle()).firstName(request.getFirstName()).middleName(request.getMiddleName()).lastName(request.getLastName()).dateOfBirth(request.getDateOfBirth()).gender(request.getGender()).nationality(request.getNationality()).maritalStatus(request.getMaritalStatus()).email(request.getEmail()).mobileNumber(request.getMobileNumber()).alternateMobileNumber(request.getAlternateMobileNumber()).permanentAddress(request.getPermanentAddress()).permanentCity(request.getPermanentCity()).permanentState(request.getPermanentState()).permanentCountry(request.getPermanentCountry()).permanentPinCode(request.getPermanentPinCode()).communicationAddress(request.getCommunicationAddress()).communicationCity(request.getCommunicationCity()).communicationState(request.getCommunicationState()).communicationCountry(request.getCommunicationCountry()).communicationPinCode(request.getCommunicationPinCode()).occupation(request.getOccupation()).annualIncome(request.getAnnualIncome()).sourceOfIncome(request.getSourceOfIncome()).language(request.getLanguage()).build();
 
         Customer savedCustomer = customerRepository.save(customer);
-        return mapToResponse(savedCustomer);
+
+
+        // 7. Check whether KYC already exists
+        if (kycRepository.existsByCustomerId(savedCustomer.getCustomerId())) {
+
+            throw new KycAlreadyExistsException("KYC already exists for customer: " + savedCustomer.getCustomerId());
+        }
+
+
+        // 8. Create KYC
+        Kyc kyc = Kyc.builder().
+                kycId(generateKycId())
+                .customerId(savedCustomer.getCustomerId())
+                .kycType(request.getKyc().getKycType())
+                .kycVerificationStatus(KycVerificationStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+
+                .build();
+
+        Kyc savedKyc = kycRepository.save(kyc);
+
+
+
+        // 9. Create upload folder
+        Path folder = Paths.get(folderPath.toUri());
+
+        if (!Files.exists(folder)) {
+            Files.createDirectories(folder);
+        }
+
+
+        // 10. Save each KYC document
+        for (int i = 0; i < request.getKyc().getDocuments().size(); i++) {
+
+            KycDocumentRequest documentRequest = request.getKyc().getDocuments().get(i);
+
+            MultipartFile uploadedFile = files.get(i);
+
+
+            // Validate file
+            if (uploadedFile == null || uploadedFile.isEmpty()) {
+
+                throw new IllegalArgumentException("File is required for " + documentRequest.getDocumentType());
+            }
+
+
+            // Get original filename
+            String originalFileName = uploadedFile.getOriginalFilename();
+
+
+            // Extract extension
+            String extension = "";
+
+            if (originalFileName != null && originalFileName.contains(".")) {
+
+                extension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            }
+
+
+            // Generate secure storage filename
+            String storedFileName = UUID.randomUUID() + extension;
+
+
+            Path filePath = folder.resolve(storedFileName);
+
+
+            // Save physical file
+            Files.copy(uploadedFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+
+            // Create KYC document
+            String contentType = uploadedFile.getContentType();
+
+            KycDocument document = KycDocument.builder()
+                    .documentId(generateDocumentId())
+                    .kycId(savedKyc.getKycId())
+                    .documentType(documentRequest.getDocumentType())
+                    .documentNumber(documentRequest.getDocumentNumber())
+                    .fileName(originalFileName)
+                    .fileUrl(filePath.toString())
+                    .contentType(contentType)
+                    .verificationStatus(KycDocumentVerificationStatus.PENDING)
+                    .build();
+            KycDocument save = kycDocumentRepository.save(document);
+        }
+        List<KycDocument> kycDocuments = kycDocumentRepository.findByKycId(savedKyc.getKycId());
+        List<KycDocumentResponse> listKycDocument = kycDocuments.stream().map(kycDocument -> mapToResponseDocument(kycDocument)).toList();
+
+        KycResponse kycResponse = mapToResponseKyc(savedKyc,listKycDocument);
+
+
+        // 12. Return response
+        return mapToResponse(savedCustomer, kycResponse);
+    }
+    private String generateDocumentId() {
+        return "DOC-" + UUID.randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 12)
+                .toUpperCase();
+    }
+    private KycResponse mapToResponseKyc(Kyc kyc,List<KycDocumentResponse> kycDocuments) {
+
+        return KycResponse.builder()
+                .kycId(kyc.getKycId())
+                .customerId(kyc.getCustomerId())
+                .kycType(kyc.getKycType())
+                .kycVerificationStatus(kyc.getKycVerificationStatus())
+                .reviewerId(kyc.getReviewerId())
+                .reviewerName(kyc.getReviewerName())
+                .rejectionReason(kyc.getRejectionReason())
+                .verifiedAt(kyc.getVerifiedAt())
+                .createdAt(kyc.getCreatedAt())
+                .updatedAt(kyc.getUpdatedAt())
+                .kycDocument(kycDocuments)
+                .build();
+    }
+    private KycDocumentResponse mapToResponseDocument(KycDocument document) {
+
+        return KycDocumentResponse.builder()
+                .documentId(document.getDocumentId())
+                .kycId(document.getKycId())
+                .documentType(document.getDocumentType())
+                .documentNumber(document.getDocumentNumber())
+                .fileName(document.getFileName())
+                .fileUrl(AppConstant.BASE_URL + "/api/v1/customers/kyc/documents/" + document.getDocumentId())
+                .kycVerificationStatus(document.getVerificationStatus())
+                .uploadedAt(document.getUploadedAt())
+                .verifiedAt(document.getVerifiedAt())
+                .build();
+    }
+
+    private void validateDuplicateCustomer(CustomerOnboardingRequest request) {
+
+        if (customerRepository.existsByMobileNumber(request.getMobileNumber())) {
+
+            throw new IllegalArgumentException("Customer already exists with mobile number");
+        }
+
+        if (request.getEmail() != null && customerRepository.existsByEmail(request.getEmail())) {
+
+            throw new IllegalArgumentException("Customer already exists with email");
+        }
     }
 
     private String generateCustomerId() {
-        return "CUST-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+
+        return "CUST-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
-    private CustomerResponse mapToResponse(Customer customer) {
+    private String generateKycId() {
+
+        return "KYC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    private CustomerResponse mapToResponse(Customer customer, KycResponse kycResponse) {
 
         return new CustomerResponse(
                 customer.getCustomerId(),
@@ -97,20 +249,16 @@ public class CustomerService {
                 customer.getPermanentCountry(),
                 customer.getPermanentPinCode(),
                 customer.getCommunicationAddress(),
-                customer.getCommunicationCity(),
-                customer.getCommunicationState(),
+                customer.getCommunicationCity(), customer.getCommunicationState(),
                 customer.getCommunicationCountry(),
-                customer.getCommunicationPinCode(),
-                customer.getEmploymentType(),
-                customer.getOccupation(),
-                customer.getEmployerName(),
-                customer.getAnnualIncome(),
-                customer.getSourceOfIncome(),
-                customer.getLanguage(),
-                customer.getStatus(),
-                customer.getCreatedAt(),
-                customer.getUpdatedAt()
+                customer.getCommunicationPinCode(), customer.getOccupation(),
+                customer.getAnnualIncome(), customer.getSourceOfIncome(),
+                customer.getLanguage(), customer.getStatus(), customer.getCreatedAt(),
+                customer.getUpdatedAt(),
+                kycResponse
+
         );
+
     }
 
     @Transactional(readOnly = true)
@@ -135,7 +283,7 @@ public class CustomerService {
 
         Page<Customer> customerPage = customerRepository.findAll(pageRequest);
 
-        Page<CustomerResponse> responsePage = customerPage.map(this::mapToResponse);
+        Page<CustomerResponse> responsePage = customerPage.map(customer -> mapToResponse(customer, null));
 
         return PageResponse.fromPage(responsePage);
     }
@@ -189,9 +337,7 @@ public class CustomerService {
         }
 
         if (request.alternateMobileNumber() != null) {
-            customer.setAlternateMobileNumber(
-                    request.alternateMobileNumber()
-            );
+            customer.setAlternateMobileNumber(request.alternateMobileNumber());
         }
 
         if (request.permanentAddress() != null) {
@@ -227,27 +373,16 @@ public class CustomerService {
         }
 
         if (request.communicationCountry() != null) {
-            customer.setCommunicationCountry(
-                    request.communicationCountry()
-            );
+            customer.setCommunicationCountry(request.communicationCountry());
         }
 
         if (request.communicationPinCode() != null) {
-            customer.setCommunicationPinCode(
-                    request.communicationPinCode()
-            );
+            customer.setCommunicationPinCode(request.communicationPinCode());
         }
 
-        if (request.employmentType() != null) {
-            customer.setEmploymentType(request.employmentType());
-        }
 
         if (request.occupation() != null) {
             customer.setOccupation(request.occupation());
-        }
-
-        if (request.employerName() != null) {
-            customer.setEmployerName(request.employerName());
         }
 
         if (request.annualIncome() != null) {
@@ -264,7 +399,7 @@ public class CustomerService {
 
         Customer updatedCustomer = customerRepository.save(customer);
 
-        return mapToResponse(updatedCustomer);
+        return mapToResponse(updatedCustomer, null);
     }
 
     private void validateStatusTransition(CustomerStatus currentStatus, CustomerStatus newStatus) {
@@ -314,15 +449,15 @@ public class CustomerService {
         if (newStatus == CustomerStatus.ACTIVE) {
 
             try {
+                Kyc kyc = kycRepository.findByCustomerId(customer.getCustomerId()).orElseThrow(() -> new CustomerNotFoundException("kyc not found :" + customer.getCustomerId()));
 
-                KycStatusResponse kycStatus = kycClient.getKycStatus(customerId);
 
-                if (!"APPROVED".equalsIgnoreCase(kycStatus.verificationStatus())) {
+                if (!"APPROVED".equalsIgnoreCase(kyc.getKycVerificationStatus().toString())) {
 
                     throw new InvalidCustomerStatusTransitionException("Customer cannot become ACTIVE because KYC is not APPROVED");
                 }
 
-            } catch (FeignException.NotFound ex) {
+            } catch (KycNotFoundException ex) {
 
                 throw new KycNotFoundException("KYC record not found for customer: " + customerId);
             }
@@ -334,34 +469,61 @@ public class CustomerService {
 
         Customer updatedCustomer = customerRepository.save(customer);
 
-        return mapToResponse(updatedCustomer);
+        return mapToResponse(updatedCustomer, null);
     }
 
     public CustomerResponse getCustomerByCustomerId(String customerId) {
         Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("customer not found: " + customerId));
-        return mapToResponse(customer);
+        return mapToResponse(customer, null);
     }
 
     public CustomerResponse closeCustomer(String customerId) {
         Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("customer not found:" + customerId));
         customer.setStatus(CustomerStatus.CLOSED);
         Customer save = customerRepository.save(customer);
-        return mapToResponse(save);
+        return mapToResponse(save, null);
     }
 
     public @Nullable CustomerResponse getCustomerByEmail(String email) {
         Customer customer = customerRepository.findByEmail(email).orElseThrow(() -> new CustomerNotFoundException("Customer not found:" + email));
-        return mapToResponse(customer);
+        return mapToResponse(customer, null);
     }
 
     public @Nullable CustomerResponse getCustomerByMobile(String mobileNumber) {
         Customer customer = customerRepository.findByMobileNumber(mobileNumber).orElseThrow(() -> new CustomerNotFoundException("Customer not found:" + mobileNumber));
-        return mapToResponse(customer);
+        return mapToResponse(customer, null);
     }
 
     public void statusUpdate(String customerId) {
         Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("Customer not found :" + customerId));
         customer.setStatus(CustomerStatus.ACTIVE);
         customerRepository.save(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerEligibilityResponse getAccountEligibility(String customerId) {
+
+        // 1. Find customer
+        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
+
+        // 2. Find KYC
+        Kyc kyc = kycRepository.findByCustomerId(customerId).orElseThrow(() -> new KycNotFoundException("KYC record not found for customer: " + customerId));
+
+        // 3. Check customer status
+        boolean customerActive = customer.getStatus() == CustomerStatus.ACTIVE;
+
+        // 4. Check KYC status
+        boolean kycApproved = kyc.getKycVerificationStatus() == KycVerificationStatus.APPROVED;
+
+        // 5. Both conditions must be true
+        boolean eligible = customerActive && kycApproved;
+
+        // 6. Return only required information
+        return CustomerEligibilityResponse.builder()
+                .customerId(customer.getCustomerId())
+                .customerStatus(customer.getStatus())
+                .kycStatus(kyc.getKycVerificationStatus())
+                .eligible(eligible)
+                .build();
     }
 }
