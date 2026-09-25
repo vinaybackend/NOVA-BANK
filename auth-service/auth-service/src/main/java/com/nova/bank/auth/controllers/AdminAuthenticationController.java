@@ -18,7 +18,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.UUID;
 
@@ -114,8 +113,6 @@ public class AdminAuthenticationController {
             ErrorResponse errorResponse = new ErrorResponse("username and password is invalid ", 401, false);
             return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
         }
-
-
     }
     
     @PostMapping("/refresh-token")

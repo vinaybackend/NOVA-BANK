@@ -1,9 +1,6 @@
 package com.nova.bank.transaction.controllers;
 
-import com.nova.bank.transaction.dto.CreateDepositRequest;
-import com.nova.bank.transaction.dto.CreateTransferRequest;
-import com.nova.bank.transaction.dto.CreateWithdrawalRequest;
-import com.nova.bank.transaction.dto.TransactionResponse;
+import com.nova.bank.transaction.dto.*;
 import com.nova.bank.transaction.services.TransactionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -48,11 +45,11 @@ public class TransactionController {
 
     @PreAuthorize("hasRole('TELLER')")
     @PostMapping("/transfer")
-    public ResponseEntity<TransactionResponse> transfer(
+    public ResponseEntity<TransferTransactionResponse> transfer(
             @Valid @RequestBody CreateTransferRequest request) {
 
-        TransactionResponse response = transactionService.transfer(request);
+        TransferTransactionResponse transfer = transactionService.transfer(request);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED).body(transfer);
     }
 }

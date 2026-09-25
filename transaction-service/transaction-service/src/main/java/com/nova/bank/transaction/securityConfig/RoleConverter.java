@@ -1,5 +1,4 @@
 package com.nova.bank.transaction.securityConfig;
-
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -8,33 +7,25 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
 public class RoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
     @Override
-    public Collection<GrantedAuthority> convert(Jwt jwt) {
+    public Collection<GrantedAuthority> convert(Jwt source) {
 
-        Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+        List<String> roles = source.getClaimAsStringList("roles");
+        System.out.println(roles);
 
-        if (realmAccess == null) {
+        if (roles == null) {
             return List.of();
         }
 
-        Object rolesObject = realmAccess.get("roles");
-
-        if (!(rolesObject instanceof List<?> roles)) {
-            return List.of();
-        }
-
-        return roles.stream()
-                .filter(String.class::isInstance)
-                .map(String.class::cast)
-                .map(role -> new SimpleGrantedAuthority(
-                        "ROLE_" + role.toUpperCase()
-                ))
+        List<GrantedAuthority> collect = roles.stream()
+                .map(role -> new SimpleGrantedAuthority(role))
                 .collect(Collectors.toList());
+        System.out.println(collect);
+        return collect;
     }
 }

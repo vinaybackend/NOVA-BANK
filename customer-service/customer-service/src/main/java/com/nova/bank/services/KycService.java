@@ -113,7 +113,6 @@ public class KycService {
         return mapToResponse(kyc);
     }
 
-    @PreAuthorize("hasRole('BRANCH_MANAGER')")
     @Transactional
     public KycResponse reviewKyc(String kycId, Authentication authentication) {
 
@@ -182,7 +181,7 @@ public class KycService {
 
     // reject
 
-    @PreAuthorize("hasRole('BRANCH_MANAGER')")
+
     @Transactional
     public KycResponse rejectKyc(String kycId, RejectKycRequest request, Authentication authentication) {
 
@@ -216,7 +215,7 @@ public class KycService {
     }
 
     // approve
-    @PreAuthorize("hasRole('BRANCH_MANAGER')")
+
     @Transactional
     public CustomerResponse approveKyc(String kycId, Authentication authentication) {
 

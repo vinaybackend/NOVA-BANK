@@ -1,5 +1,4 @@
-package com.nova.bank.securityConfig;
-import org.slf4j.LoggerFactory;
+package com.nova.bank.jwtConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +18,8 @@ import reactor.core.publisher.Mono;
 public class SecurityConfig {
     @Autowired
     private RoleConverter roleConverter;
+    @Autowired
+    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity security){
         security.cors(Customizer.withDefaults())
@@ -31,9 +32,15 @@ public class SecurityConfig {
                                 "/auth-service/api/v1/auth/refresh-token",
                                 "/auth-service/api/v1/admin/auth/refresh-token")
                         .permitAll()
-                        .pathMatchers("/auth-service/api/v1/admin/auth/**").hasRole("ADMIN")
+                        .pathMatchers("/auth-service/api/v1/admin/auth/**","/api/v1/branches/**").hasRole("ADMIN")
+                        .pathMatchers("/api/v1/customers/**","/api/v1/kycs/**").hasAnyRole("CUSTOMER","ADMIN","BRANCH_MANAGER","KYC_OFFICER","TELLER")
+                        .pathMatchers("/api/v1/accounts").hasAnyRole("BRANCH_MANAGER")
+                        .pathMatchers("/api/v1/accounts/internal/**").hasAnyRole("ADMIN","TELLER","BRANCH_MANAGER")
+                        .pathMatchers("/api/v1/transactions").hasAnyRole("BRANCH_MANAGER","TELLER")
+
                         .anyExchange().authenticated())
-                .oauth2ResourceServer(config->config.jwt(jwtSpec -> jwtSpec.jwtAuthenticationConverter(roleExtract())));
+                .oauth2ResourceServer(config->config.jwt(jwtSpec -> jwtSpec.jwtAuthenticationConverter(roleExtract()))
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint));
         return security.build();
     }
 

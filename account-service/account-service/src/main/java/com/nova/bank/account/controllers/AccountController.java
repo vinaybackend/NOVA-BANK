@@ -41,6 +41,7 @@ public class AccountController {
     }
 
     // get account by account number
+    @PreAuthorize("hasRole('BRANCH_MANAGER')")
     @GetMapping("/account-number/{accountNumber}")
     public ResponseEntity<AccountResponse> getAccountByNumber(@PathVariable String accountNumber) {
 

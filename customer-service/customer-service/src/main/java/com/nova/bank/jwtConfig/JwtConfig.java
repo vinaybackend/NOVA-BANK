@@ -1,9 +1,10 @@
-package com.nova.bank.securityConfig;
+package com.nova.bank.jwtConfig;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -14,10 +15,10 @@ public class JwtConfig {
 
     @Value("${jwt.secret}")
     private String secret;
-
     @Bean
-    public ReactiveJwtDecoder reactiveJwtDecoder() {
-        SecretKey key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-        return NimbusReactiveJwtDecoder.withSecretKey(key).build();
+    public JwtDecoder jwtDecoder(){
+        SecretKey secretKey=new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8),"HmacSHA256");
+
+        return NimbusJwtDecoder.withSecretKey(secretKey).build();
     }
 }

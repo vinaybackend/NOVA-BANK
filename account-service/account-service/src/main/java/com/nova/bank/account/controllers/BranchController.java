@@ -17,7 +17,7 @@ public class BranchController {
 
     private final BranchService branchService;
 
-    @PreAuthorize("hasRole('BRANCH_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/create")
     public ResponseEntity<BranchResponse> createBranch(@Valid @RequestBody CreateBranchRequest request) {
 

@@ -113,7 +113,6 @@ public class CustomerController {
     }
 
     @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER','ADMIN')")
-
     @GetMapping("/kyc/documents/{documentId}")
     public ResponseEntity<Resource> getKycDocument(@PathVariable String documentId) throws IOException {
 

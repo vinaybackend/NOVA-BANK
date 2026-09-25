@@ -25,27 +25,19 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse deposit(CreateDepositRequest request) {
-
         // Get account
         AccountResponse account = accountClient.getAccountByNumber(request.getAccountNumber());
-
         // Validate currency
         if (!account.getCurrency().equalsIgnoreCase(request.getCurrency())) {
-
             throw new IllegalArgumentException("Transaction currency does not match account currency");
         }
-
         // Create transaction ID
         String transactionId = generateTransactionId();
-
         //Create reference
         String reference = generateReference();
-
         LocalDateTime now = LocalDateTime.now();
-
         // Credit account
         accountClient.creditAccount(request.getAccountNumber(), request.getAmount());
-
         // Create successful transaction record
         Transaction transaction = Transaction.builder()
                 .transactionId(transactionId)
@@ -136,7 +128,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponse transfer(CreateTransferRequest request) {
+    public TransferTransactionResponse transfer(CreateTransferRequest request) {
 
         // Source and destination cannot be same
         if (request.getFromAccountNumber().equals(request.getToAccountNumber())) {
@@ -189,6 +181,24 @@ public class TransactionService {
         Transaction savedTransaction = transactionRepository.save(transaction);
 
         //  Return response
-        return mapToResponse(savedTransaction);
+        return mapToResponseTransfer(savedTransaction);
+    }
+
+    private TransferTransactionResponse mapToResponseTransfer(Transaction transaction) {
+
+        return TransferTransactionResponse.builder()
+                .transactionId(transaction.getTransactionId())
+                .customerId(transaction.getCustomerId())
+                .transactionType(transaction.getTransactionType())
+                .fromAccountNumber(transaction.getFromAccountNumber())
+                .toAccountNumber(transaction.getToAccountNumber())
+                .amount(transaction.getAmount())
+                .currency(transaction.getCurrency())
+                .transactionStatus(transaction.getTransactionStatus())
+                .reference(transaction.getReference())
+                .description(transaction.getDescription())
+                .createdAt(transaction.getCreatedAt())
+                .updatedAt(transaction.getUpdatedAt())
+                .build();
     }
 }

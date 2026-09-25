@@ -1,4 +1,4 @@
-package com.nova.bank.securityConfig;
+package com.nova.bank.jwtConfig;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
