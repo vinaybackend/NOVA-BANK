@@ -1,5 +1,7 @@
     package com.nova.bank.entities;
+    import com.nova.bank.client.AccountType;
     import jakarta.persistence.*;
+    import jakarta.validation.constraints.NotBlank;
     import lombok.*;
 
     import java.math.BigDecimal;
@@ -21,6 +23,11 @@
 
     @Column(name = "customer_id", nullable = false, unique = true, length = 30, updatable = false)
     private String customerId;
+    @Enumerated(EnumType.STRING)
+    private AccountType accountType;
+
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "title", length = 10)

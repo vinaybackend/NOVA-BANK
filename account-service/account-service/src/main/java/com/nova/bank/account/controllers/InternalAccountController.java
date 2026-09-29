@@ -3,6 +3,7 @@ package com.nova.bank.account.controllers;
 import com.nova.bank.account.dto.AccountResponse;
 import com.nova.bank.account.services.AccountService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 
@@ -24,6 +25,7 @@ public class InternalAccountController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasRole('TELLER')")
     @PostMapping("/debit/{accountNumber}")
     public ResponseEntity<AccountResponse> debitAccount(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
 

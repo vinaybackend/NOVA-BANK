@@ -1,5 +1,7 @@
 package com.nova.bank.dto;
+import com.nova.bank.client.AccountType;
 import com.nova.bank.entities.*;
+import jakarta.persistence.Column;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -12,6 +14,12 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CustomerOnboardingRequest {
+
+    @NotNull(message = "Account type is required")
+    private AccountType accountType;
+
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency;
 
     @NotNull(message = "Title is required")
     private Title title;

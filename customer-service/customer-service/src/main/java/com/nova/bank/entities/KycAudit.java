@@ -27,8 +27,6 @@ public class KycAudit {
     @Column(nullable = false)
     private String performedBy;
 
-    private String performedByName;
-
     @Column(nullable = false)
     private LocalDateTime performedAt;
 

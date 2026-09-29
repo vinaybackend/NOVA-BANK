@@ -129,6 +129,19 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(build);
     }
+
+    @ExceptionHandler(EmailMissMatch.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(EmailMissMatch emailMissMatch, HttpServletRequest request) {
+        ErrorResponse build = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("INTERNAL_SERVER_ERROR")
+                .message(emailMissMatch.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(build);
+    }
 }
 
 

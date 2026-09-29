@@ -26,6 +26,7 @@ public class BranchController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PreAuthorize("hasRole('KYC_OFFICER')")
     @GetMapping("/{branchId}")
     public ResponseEntity<BranchResponse> getBranch(@PathVariable String branchId) {
 

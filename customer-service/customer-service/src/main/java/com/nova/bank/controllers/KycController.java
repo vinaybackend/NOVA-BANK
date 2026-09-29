@@ -1,4 +1,6 @@
 package com.nova.bank.controllers;
+import com.nova.bank.client.AccountResponse;
+import com.nova.bank.client.CreateAccountRequest;
 import com.nova.bank.dto.*;
 import com.nova.bank.services.KycService;
 import jakarta.validation.Valid;
@@ -32,6 +34,7 @@ public class KycController {
 //        return ResponseEntity.ok(response);
 //    }
 
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<KycResponse> getKycByCustomerId(@PathVariable String customerId) {
 
@@ -62,12 +65,14 @@ public class KycController {
     //approve
     @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER','ADMIN')")
     @PatchMapping("/approve/{kycId}")
-    public ResponseEntity<CustomerResponse> approveKyc(@PathVariable String kycId, org.springframework.security.core.Authentication authentication) {
+    public ResponseEntity<AccountOpenResponse> approveKyc(@PathVariable String kycId, org.springframework.security.core.Authentication authentication, @RequestBody CreateAccountRequest accountRequest) {
 
-        CustomerResponse customerResponse = kycService.approveKyc(kycId, authentication);
+        AccountOpenResponse accountOpenResponse = kycService.approveKyc(kycId, authentication, accountRequest);
 
-        return new ResponseEntity<>(customerResponse,HttpStatus.OK);
+        return new ResponseEntity<>(accountOpenResponse,HttpStatus.OK);
     }
+
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
     @GetMapping("/status/{customerId}")
     public KycStatusResponse getKycStatus(@PathVariable String customerId){
         KycStatusResponse kycStatusByCustomerId = (KycStatusResponse) kycService.getKycStatusByCustomerId(customerId);

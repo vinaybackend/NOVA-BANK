@@ -1,5 +1,7 @@
 package com.nova.bank.services;
 
+import com.nova.bank.client.AccountClient;
+import com.nova.bank.client.AccountResponse;
 import com.nova.bank.config.AppConstant;
 import com.nova.bank.dto.*;
 import com.nova.bank.entities.*;
@@ -12,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,6 +34,7 @@ public class CustomerService {
     private final CustomerRepository customerRepository;
     private final KycRepository kycRepository;
     private final KycDocumentRepository kycDocumentRepository;
+    private final AccountClient accountClient;
 
     private final Path folderPath = Paths.get("uploads", "kyc");
 
@@ -69,7 +73,36 @@ public class CustomerService {
         String customerId = generateCustomerId();
 
         // 6. Create Customer
-        Customer customer = Customer.builder().customerId(customerId).title(request.getTitle()).firstName(request.getFirstName()).middleName(request.getMiddleName()).lastName(request.getLastName()).dateOfBirth(request.getDateOfBirth()).gender(request.getGender()).nationality(request.getNationality()).maritalStatus(request.getMaritalStatus()).email(request.getEmail()).mobileNumber(request.getMobileNumber()).alternateMobileNumber(request.getAlternateMobileNumber()).permanentAddress(request.getPermanentAddress()).permanentCity(request.getPermanentCity()).permanentState(request.getPermanentState()).permanentCountry(request.getPermanentCountry()).permanentPinCode(request.getPermanentPinCode()).communicationAddress(request.getCommunicationAddress()).communicationCity(request.getCommunicationCity()).communicationState(request.getCommunicationState()).communicationCountry(request.getCommunicationCountry()).communicationPinCode(request.getCommunicationPinCode()).occupation(request.getOccupation()).annualIncome(request.getAnnualIncome()).sourceOfIncome(request.getSourceOfIncome()).language(request.getLanguage()).build();
+        Customer customer = Customer.builder()
+                .customerId(customerId)
+                .title(request.getTitle())
+                .firstName(request.getFirstName())
+                .middleName(request.getMiddleName())
+                .lastName(request.getLastName())
+                .dateOfBirth(request.getDateOfBirth())
+                .gender(request.getGender())
+                .nationality(request.getNationality())
+                .maritalStatus(request.getMaritalStatus())
+                .email(request.getEmail())
+                .mobileNumber(request.getMobileNumber())
+                .alternateMobileNumber(request.getAlternateMobileNumber())
+                .permanentAddress(request.getPermanentAddress())
+                .permanentCity(request.getPermanentCity()).
+                permanentState(request.getPermanentState())
+                .permanentCountry(request.getPermanentCountry())
+                .permanentPinCode(request.getPermanentPinCode())
+                .communicationAddress(request.getCommunicationAddress())
+                .communicationCity(request.getCommunicationCity())
+                .communicationState(request.getCommunicationState())
+                .communicationCountry(request.getCommunicationCountry())
+                .communicationPinCode(request.getCommunicationPinCode())
+                .occupation(request.getOccupation())
+                .annualIncome(request.getAnnualIncome())
+                .sourceOfIncome(request.getSourceOfIncome())
+                .language(request.getLanguage())
+                .accountType(request.getAccountType())
+                .currency(request.getCurrency())
+                .build();
 
         Customer savedCustomer = customerRepository.save(customer);
 
@@ -89,7 +122,6 @@ public class CustomerService {
                 .kycVerificationStatus(KycVerificationStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
-
                 .build();
 
         Kyc savedKyc = kycRepository.save(kyc);
@@ -182,7 +214,6 @@ public class CustomerService {
                 .kycType(kyc.getKycType())
                 .kycVerificationStatus(kyc.getKycVerificationStatus())
                 .reviewerId(kyc.getReviewerId())
-                .reviewerName(kyc.getReviewerName())
                 .rejectionReason(kyc.getRejectionReason())
                 .verifiedAt(kyc.getVerifiedAt())
                 .createdAt(kyc.getCreatedAt())
@@ -484,9 +515,23 @@ public class CustomerService {
         return mapToResponse(save, null);
     }
 
-    public @Nullable CustomerResponse getCustomerByEmail(String email) {
-        Customer customer = customerRepository.findByEmail(email).orElseThrow(() -> new CustomerNotFoundException("Customer not found:" + email));
-        return mapToResponse(customer, null);
+    public Object getCustomerByEmail(String email, Authentication authentication) {
+
+        Customer customer = customerRepository.findByEmail(email).orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + email));
+
+        if (!customer.getEmail().equals(authentication.getName())) {
+            throw new EmailMissMatch("Login email and provided email do not match: " + email);
+        }
+
+        if (customer.getStatus() != CustomerStatus.ACTIVE) {
+            return "Kyc is pending";
+        }
+
+        AccountResponse accountByCustomerId = accountClient.getAccountByCustomerId(customer.getCustomerId());
+
+        return CustomerAccountResponse.builder()
+                .account(accountByCustomerId)
+                .build();
     }
 
     public @Nullable CustomerResponse getCustomerByMobile(String mobileNumber) {

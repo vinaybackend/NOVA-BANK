@@ -1,7 +1,7 @@
 package com.nova.bank.account.dto;
 
-import com.nova.bank.account.entities.AccountStatus;
-import com.nova.bank.account.entities.VerificationStatus;
+import com.nova.bank.account.clients.CustomerStatus;
+import com.nova.bank.account.entities.KycVerificationStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,9 +11,9 @@ public class CustomerEligibilityResponse {
 
     private String customerId;
 
-    private AccountStatus customerStatus;
+    private CustomerStatus customerStatus;
 
-    private VerificationStatus kycStatus;
+    private KycVerificationStatus kycStatus;
 
     private boolean eligible;
 }

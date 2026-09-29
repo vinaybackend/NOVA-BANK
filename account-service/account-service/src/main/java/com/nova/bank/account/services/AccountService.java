@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -74,7 +73,7 @@ public class AccountService {
                 .ifsc(branch.getIfsc())
                 .accountType(request.getAccountType())
                 .accountStatus(AccountStatus.ACTIVE)
-                .balance(BigDecimal.ZERO)
+                .balance(request.getBalance())
                 .currency(request.getCurrency().toUpperCase())
                 .createdAt(now)
                 .updatedAt(now)
@@ -93,25 +92,25 @@ public class AccountService {
         accountHolderRepository.save(primaryHolder);
 
         // 8. Create Nominee
-        if (request.getNominee() != null) {
-
-            CreateNomineeRequest nomineeRequest = request.getNominee();
-
-            AccountNominee nominee = AccountNominee.builder()
-                    .nomineeId(generateNomineeId())
-                    .accountId(savedAccount.getAccountId())
-                    .fullName(nomineeRequest.getFullName())
-                    .relationship(nomineeRequest.getRelationship())
-                    .dateOfBirth(nomineeRequest.getDateOfBirth())
-                    .mobileNumber(nomineeRequest.getMobileNumber())
-                    .address(nomineeRequest.getAddress())
-                    .active(true)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build();
-
-            accountNomineeRepository.save(nominee);
-        }
+//        if (request.getNominee() != null) {
+//
+//            CreateNomineeRequest nomineeRequest = request.getNominee();
+//
+//            AccountNominee nominee = AccountNominee.builder()
+//                    .nomineeId(generateNomineeId())
+//                    .accountId(savedAccount.getAccountId())
+//                    .fullName(nomineeRequest.getFullName())
+//                    .relationship(nomineeRequest.getRelationship())
+//                    .dateOfBirth(nomineeRequest.getDateOfBirth())
+//                    .mobileNumber(nomineeRequest.getMobileNumber())
+//                    .address(nomineeRequest.getAddress())
+//                    .active(true)
+//                    .createdAt(now)
+//                    .updatedAt(now)
+//                    .build();
+//
+//            accountNomineeRepository.save(nominee);
+//        }
 
         // 9. Return Account response
         return mapToResponse(savedAccount);
@@ -126,26 +125,26 @@ public class AccountService {
                         .toUpperCase();
     }
     private AccountResponse mapToResponse(Account account) {
-
-        AccountNominee nominee = accountNomineeRepository.findByAccountIdAndActiveTrue(account.getAccountId()).orElse(null);
-
-        NomineeResponse nomineeResponse = null;
-
-        if (nominee != null) {
-
-            nomineeResponse = NomineeResponse.builder()
-                    .nomineeId(nominee.getNomineeId())
-                    .accountId(nominee.getAccountId())
-                    .fullName(nominee.getFullName())
-                    .relationship(nominee.getRelationship())
-                    .dateOfBirth(nominee.getDateOfBirth())
-                    .mobileNumber(nominee.getMobileNumber())
-                    .address(nominee.getAddress())
-                    .active(nominee.getActive())
-                    .createdAt(nominee.getCreatedAt())
-                    .updatedAt(nominee.getUpdatedAt())
-                    .build();
-        }
+//
+//        AccountNominee nominee = accountNomineeRepository.findByAccountIdAndActiveTrue(account.getAccountId()).orElse(null);
+//
+//        NomineeResponse nomineeResponse = null;
+//
+//        if (nominee != null) {
+//
+//            nomineeResponse = NomineeResponse.builder()
+//                    .nomineeId(nominee.getNomineeId())
+//                    .accountId(nominee.getAccountId())
+//                    .fullName(nominee.getFullName())
+//                    .relationship(nominee.getRelationship())
+//                    .dateOfBirth(nominee.getDateOfBirth())
+//                    .mobileNumber(nominee.getMobileNumber())
+//                    .address(nominee.getAddress())
+//                    .active(nominee.getActive())
+//                    .createdAt(nominee.getCreatedAt())
+//                    .updatedAt(nominee.getUpdatedAt())
+//                    .build();
+//        }
 
         return AccountResponse.builder()
                 .accountId(account.getAccountId())
@@ -158,7 +157,6 @@ public class AccountService {
                 .branchName(account.getBranchName())
                 .ifsc(account.getIfsc())
                 .currency(account.getCurrency())
-                .nominee(nomineeResponse)
                 .createdAt(account.getCreatedAt())
                 .updatedAt(account.getUpdatedAt())
                 .build();
@@ -200,11 +198,11 @@ public class AccountService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountResponse> getAccountsByCustomerId(String customerId) {
+    public AccountResponse getAccountsByCustomerId(String customerId) {
 
-        List<Account> accounts = accountRepository.findByCustomerId(customerId);
+        Account accounts = accountRepository.findByCustomerId(customerId);
 
-        return accounts.stream().map(this::mapToResponse).toList();
+        return mapToResponse(accounts);
     }
 
     // account status

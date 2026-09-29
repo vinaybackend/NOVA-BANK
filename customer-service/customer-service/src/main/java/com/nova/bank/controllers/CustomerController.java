@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -38,7 +39,6 @@ public class CustomerController {
     @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','HR')")
     @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CustomerResponse> createCustomer(@RequestPart("request") String request, @RequestPart("files") List<MultipartFile> files) throws IOException {
-        System.out.println("========== CUSTOMER CREATE API HIT ==========");
         System.out.println("Files received: " + files.size());
         // Convert JSON String into CustomerOnboardingRequest object
         CustomerOnboardingRequest onboardingRequest = objectMapper.readValue(request, CustomerOnboardingRequest.class);
@@ -51,7 +51,7 @@ public class CustomerController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
     @GetMapping("/{customerId}")
     public ResponseEntity<CustomerResponse> getCustomer(@PathVariable String customerId) {
 
@@ -59,12 +59,12 @@ public class CustomerController {
 
         return ResponseEntity.ok(response);
     }
-
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER')")
     @GetMapping("/all")
-    public ResponseEntity<PageResponse<CustomerResponse>> getAllTrain(@RequestParam(value = "page", defaultValue = AppConstant.page) int page,
-                                                                      @RequestParam(value = "size", defaultValue = AppConstant.page_size) int size,
-                                                                      @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
-                                                                      @RequestParam(value = "sortDir", defaultValue = "asc") String sortDir) {
+    public ResponseEntity<PageResponse<CustomerResponse>> getALlCustomer(@RequestParam(value = "page", defaultValue = AppConstant.page) int page,
+                                                                         @RequestParam(value = "size", defaultValue = AppConstant.page_size) int size,
+                                                                         @RequestParam(value = "sortBy", defaultValue = "id") String sortBy,
+                                                                         @RequestParam(value = "sortDir", defaultValue = "asc") String sortDir) {
 
         PageResponse<CustomerResponse> allCustomers = customerService.getAllCustomers(page, size, sortBy, sortDir);
 
@@ -72,6 +72,7 @@ public class CustomerController {
 
     }
 
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
     @PutMapping("/update/{customerId}")
     public ResponseEntity<CustomerResponse> updateCustomer(@PathVariable String customerId, @Valid @RequestBody UpdateCustomerRequest request) {
 
@@ -80,6 +81,7 @@ public class CustomerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER')")
     @PatchMapping("/status/{customerId}")
     public ResponseEntity<CustomerResponse> updateCustomerStatus(@PathVariable String customerId, @Valid @RequestBody UpdateCustomerStatusRequest request) {
 
@@ -87,6 +89,7 @@ public class CustomerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER')")
     @PatchMapping("/{customerId}/close")
     public ResponseEntity<CustomerResponse> closeCustomer(@PathVariable String customerId) {
 
@@ -95,18 +98,22 @@ public class CustomerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
     @GetMapping("/search/{email}")
-    public ResponseEntity<CustomerResponse> getCustomerByEmail(@PathVariable String email) {
+    public ResponseEntity<Object> getCustomerByEmail(@PathVariable String email, Authentication authentication) {
 
-        return ResponseEntity.ok(customerService.getCustomerByEmail(email));
+        Object customerByEmail = customerService.getCustomerByEmail(email, authentication);
+        return new ResponseEntity<>(customerByEmail,HttpStatus.OK);
     }
 
-    @GetMapping("/search/{mobile}")
-    public ResponseEntity<CustomerResponse> getCustomerByMobile(@PathVariable String mobileNumber) {
+//    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
+//    @GetMapping("/search/{mobile}")
+//    public ResponseEntity<CustomerResponse> getCustomerByMobile(@PathVariable String mobileNumber) {
+//
+//        return ResponseEntity.ok(customerService.getCustomerByMobile(mobileNumber));
+//    }
 
-        return ResponseEntity.ok(customerService.getCustomerByMobile(mobileNumber));
-    }
-
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER')")
     @PutMapping("active/{customerId}")
     public void statusUpdates(@PathVariable String customerId) {
         customerService.statusUpdate(customerId);
@@ -116,10 +123,7 @@ public class CustomerController {
     @GetMapping("/kyc/documents/{documentId}")
     public ResponseEntity<Resource> getKycDocument(@PathVariable String documentId) throws IOException {
 
-        KycDocument document = kycDocumentRepository
-                .findByDocumentId(documentId)
-                .orElseThrow(() ->
-                        new RuntimeException("Document not found: " + documentId));
+        KycDocument document = kycDocumentRepository.findByDocumentId(documentId).orElseThrow(() -> new RuntimeException("Document not found: " + documentId));
 
         Path filePath = Paths.get(document.getFileUrl());
 
@@ -141,11 +145,12 @@ public class CustomerController {
                 .body(resource);
     }
 
+    @PreAuthorize("hasRole('KYC_OFFICER')")
     @GetMapping("/account-eligibility/{customerId}")
-    public ResponseEntity<CustomerEligibilityResponse> getAccountEligibility(@PathVariable String customerId) {
+    public CustomerEligibilityResponse getAccountEligibility(@PathVariable String customerId) {
 
         CustomerEligibilityResponse response = customerService.getAccountEligibility(customerId);
 
-        return ResponseEntity.ok(response);
+        return response;
     }
 }

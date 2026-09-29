@@ -2,14 +2,15 @@ package com.nova.bank.account.dto;
 
 import com.nova.bank.account.entities.AccountStatus;
 import com.nova.bank.account.entities.AccountType;
-import lombok.Builder;
-import lombok.Getter;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Getter
+@Data
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class AccountResponse {
 
     private String accountId;
@@ -25,9 +26,6 @@ public class AccountResponse {
     private String branchId;
     private String branchName;
     private String ifsc;
-
-    private NomineeResponse nominee;
-
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

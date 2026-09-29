@@ -1,4 +1,7 @@
 package com.nova.bank.services;
+import com.nova.bank.client.AccountClient;
+import com.nova.bank.client.AccountResponse;
+import com.nova.bank.client.CreateAccountRequest;
 import com.nova.bank.config.AppConstant;
 import com.nova.bank.dto.*;
 import com.nova.bank.entities.*;
@@ -28,15 +31,17 @@ public class KycService {
     private final CustomerRepository customerRepository;
     private final KycDocumentRepository kycDocumentRepository;
     private final ModelMapper modelMapper;
+    private final AccountClient accountClient;
 
-    public KycService(KycRepository kycRepository, KycAuditRepository kycAuditRepository, CustomerRepository customerRepository, KycDocumentRepository kycDocumentRepository, ModelMapper modelMapper) {
+    public KycService(KycRepository kycRepository, KycAuditRepository kycAuditRepository, CustomerRepository customerRepository, KycDocumentRepository kycDocumentRepository, ModelMapper modelMapper, AccountClient accountClient) {
         this.kycRepository = kycRepository;
         this.kycAuditRepository = kycAuditRepository;
         this.customerRepository = customerRepository;
         this.kycDocumentRepository = kycDocumentRepository;
         this.modelMapper = modelMapper;
+        this.accountClient = accountClient;
     }
-//
+
 //    @Transactional
 //    public KycResponse createKyc(CreateKycRequest request) {
 //
@@ -216,8 +221,7 @@ public class KycService {
 
     // approve
 
-    @Transactional
-    public CustomerResponse approveKyc(String kycId, Authentication authentication) {
+    public AccountOpenResponse approveKyc(String kycId, Authentication authentication,CreateAccountRequest request) {
 
         Kyc kyc = kycRepository.findByKycId(kycId).orElseThrow(() -> new KycNotFoundException("KYC not found: " + kycId));
 
@@ -236,7 +240,7 @@ public class KycService {
         customer.setStatus(CustomerStatus.ACTIVE);
 
         createAudit(updatedKyc, KycAuditAction.APPROVE, authentication, "KYC approved");
-        KycResponse kycResponse = mapToResponse(updatedKyc);
+//        KycResponse kycResponse = mapToResponse(updatedKyc);
 
         List<KycDocument> byKycId = kycDocumentRepository.findByKycId(updatedKyc.getKycId());
 
@@ -246,10 +250,23 @@ public class KycService {
             return kycDocumentRepository.save(kycDocument);
         }).toList();
 
-        List<KycDocumentResponse> list = list1.stream().map(kycDocument -> mapToResponseDocument(kycDocument)).toList();
-        kycResponse.setKycDocument(list);
         Customer updatedCustomer = customerRepository.save(customer);
-       return mapToCustomerResponse(updatedCustomer,kycResponse);
+
+        request.setAccountType(updatedCustomer.getAccountType());
+        request.setBranchId("BR-D7CA5EADF5");
+        request.setCustomerId(updatedCustomer.getCustomerId());
+
+        AccountResponse accountResponse = accountClient.openAccount(request);
+        AccountOpenResponse accountOpenSuccessfully = AccountOpenResponse.builder()
+                .customerId(accountResponse.getCustomerId())
+                .accountNo(accountResponse.getAccountNumber())
+                .BranchName(accountResponse.getBranchName())
+                .about("Account open successfully")
+                .build();
+
+        return accountOpenSuccessfully;
+
+
     }
     private CustomerResponse mapToCustomerResponse(Customer customer, KycResponse kycResponse) {
 
@@ -322,7 +339,6 @@ public class KycService {
                 .kycId(kyc.getKycId())
                 .action(action)
                 .performedBy(performedBy)
-                .performedByName(performedByName)
                 .performedAt(LocalDateTime.now())
                 .remarks(remarks)
                 .build();

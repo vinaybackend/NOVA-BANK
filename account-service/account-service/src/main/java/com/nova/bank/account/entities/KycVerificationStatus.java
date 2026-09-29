@@ -1,6 +1,6 @@
 package com.nova.bank.account.entities;
 
-public enum VerificationStatus {
+public enum KycVerificationStatus {
 
     PENDING,
     UNDER_REVIEW,

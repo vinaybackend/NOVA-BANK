@@ -10,5 +10,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface CustomerClient {
 
     @GetMapping("/api/v1/customers/account-eligibility/{customerId}")
-    CustomerEligibilityResponse getAccountEligibility(@PathVariable("customerId") String customerId);
+    CustomerEligibilityResponse getAccountEligibility(@PathVariable String customerId);
 }

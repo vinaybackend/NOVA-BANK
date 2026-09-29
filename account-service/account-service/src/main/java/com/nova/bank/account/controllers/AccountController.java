@@ -5,12 +5,9 @@ import com.nova.bank.account.dto.CreateAccountRequest;
 import com.nova.bank.account.dto.UpdateAccountStatusRequest;
 import com.nova.bank.account.services.AccountService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/accounts")
@@ -22,16 +19,17 @@ public class AccountController {
         this.accountService = accountService;
     }
 
-    @PreAuthorize("hasRole('BRANCH_MANAGER')")
+    @PreAuthorize("hasAnyRole('BRANCH_MANAGER','KYC_OFFICER')")
     @PostMapping("/create")
-    public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+    public AccountResponse createAccount(@Valid @RequestBody CreateAccountRequest request) {
 
         AccountResponse response = accountService.createAccount(request);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return response;
     }
 
 // get account by accountId
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','KYC_OFFICER')")
     @GetMapping("/{accountId}")
     public ResponseEntity<AccountResponse> getAccountById(@PathVariable String accountId) {
 
@@ -41,7 +39,7 @@ public class AccountController {
     }
 
     // get account by account number
-    @PreAuthorize("hasRole('BRANCH_MANAGER')")
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','TELLER')")
     @GetMapping("/account-number/{accountNumber}")
     public ResponseEntity<AccountResponse> getAccountByNumber(@PathVariable String accountNumber) {
 
@@ -51,12 +49,13 @@ public class AccountController {
     }
 
     // get account detail by customerId
+    @PreAuthorize("hasAnyRole('CUSTOMER','BRANCH_MANAGER','ADMIN')")
     @GetMapping("/customer/{customerId}")
-    public ResponseEntity<List<AccountResponse>> getAccountsByCustomerId(@PathVariable String customerId) {
+    public ResponseEntity<AccountResponse> getAccountsByCustomerId(@PathVariable String customerId) {
 
-        List<AccountResponse> response = accountService.getAccountsByCustomerId(customerId);
+        AccountResponse accountsByCustomerId = accountService.getAccountsByCustomerId(customerId);
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(accountsByCustomerId);
     }
 
     @PatchMapping("/status/{accountId}")

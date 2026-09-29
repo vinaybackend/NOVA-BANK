@@ -30,11 +30,9 @@ public class TransactionController {
 
     @PreAuthorize("hasRole('TELLER')")
     @PostMapping("/withdraw")
-    public ResponseEntity<TransactionResponse> withdraw(
-            @Valid @RequestBody CreateWithdrawalRequest request) {
+    public ResponseEntity<TransactionResponse> withdraw(@Valid @RequestBody CreateWithdrawalRequest request) {
 
-        TransactionResponse response =
-                transactionService.withdraw(request);
+        TransactionResponse response = transactionService.withdraw(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
