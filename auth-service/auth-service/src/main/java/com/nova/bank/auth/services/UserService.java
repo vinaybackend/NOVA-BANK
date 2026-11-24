@@ -1,11 +1,12 @@
 package com.nova.bank.auth.services;
 
 import com.nova.bank.auth.dto.AdminRegisterUser;
+import com.nova.bank.auth.dto.RegisterRequest;
 import com.nova.bank.auth.dto.UserDto;
 
 public interface UserService {
 
-    void registerUser(UserDto userDto);
+    void registerUser(RegisterRequest request);
 
-    void adminRegisterEmployee(AdminRegisterUser adminRegisterUser);
+   Long adminRegisterEmployee(AdminRegisterUser adminRegisterUser);
 }

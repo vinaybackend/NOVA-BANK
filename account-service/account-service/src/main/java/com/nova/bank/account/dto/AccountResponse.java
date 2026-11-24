@@ -23,9 +23,12 @@ public class AccountResponse {
     private BigDecimal balance;
     private String currency;
 
-    private String branchId;
+    private String branchCode;
     private String branchName;
     private String ifsc;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private DebitCardPreviewResponse debitCard;
+    private String name;
+    private String email;
 }

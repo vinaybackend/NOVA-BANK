@@ -23,6 +23,8 @@ public class AdminRegisterUser {
     @NotBlank(message = "mobile number required ")
     @Size(min = 10, max = 10, message = "10 digit required")
     private String phone;
-    private LocalDateTime createAt;
-    private Role role;
+    private String branchCode;
+    private String branchName;
+    private String ifsc;
+    private String roleName;
 }

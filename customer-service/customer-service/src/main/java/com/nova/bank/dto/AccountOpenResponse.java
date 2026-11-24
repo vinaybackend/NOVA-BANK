@@ -14,6 +14,6 @@ public class AccountOpenResponse {
     private String customerId;
     private String accountNo;
     private String BranchName;
-    private String about;
+    private AccountOpenStatus status;
 
 }

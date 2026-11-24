@@ -16,6 +16,10 @@ public class TransactionResponse {
 
     private String accountNumber;
 
+    private String fromAccountNumber;
+
+    private String toAccountNumber;
+
     private String customerId;
 
     private TransactionType transactionType;
@@ -29,6 +33,8 @@ public class TransactionResponse {
     private String reference;
 
     private String description;
+
+    private String performedBy;
 
     private LocalDateTime createdAt;
 

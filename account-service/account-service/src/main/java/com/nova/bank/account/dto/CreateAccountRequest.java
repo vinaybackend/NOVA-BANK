@@ -28,6 +28,11 @@ public class CreateAccountRequest {
 
     @NotBlank(message = "Branch ID is required")
     @Size(max = 30, message = "Branch ID must not exceed 30 characters")
-    private String branchId;
+    private String branchCode;
+
+    private String email;
+    private String name;
+
+    private String mobileNumber;
 
 }

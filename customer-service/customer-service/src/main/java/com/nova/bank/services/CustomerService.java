@@ -2,95 +2,101 @@ package com.nova.bank.services;
 
 import com.nova.bank.client.AccountClient;
 import com.nova.bank.client.AccountResponse;
-import com.nova.bank.config.AppConstant;
+import com.nova.bank.client.BranchClient;
+import com.nova.bank.client.BranchResponse;
+import com.nova.bank.client.CreateAccountRequest;
 import com.nova.bank.dto.*;
+import com.nova.bank.dto.request.CustomerUpdatedRequest;
 import com.nova.bank.entities.*;
 import com.nova.bank.exception.*;
 import com.nova.bank.repositories.CustomerRepository;
-import com.nova.bank.repositories.KycDocumentRepository;
-import com.nova.bank.repositories.KycRepository;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException;
+
+import java.math.BigDecimal;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
-    private final KycRepository kycRepository;
-    private final KycDocumentRepository kycDocumentRepository;
     private final AccountClient accountClient;
+    private final BranchClient branchClient;
+    private final CustomerImageStorageService imageStorageService;
+    @Value("${nova.upload.customer-dir}")
+    private String customerUploadDirectory;
 
-    private final Path folderPath = Paths.get("uploads", "kyc");
+    public CustomerService(CustomerRepository customerRepository, AccountClient accountClient, BranchClient branchClient, CustomerImageStorageService imageStorageService) {
+        this.customerRepository = customerRepository;
+        this.accountClient = accountClient;
+        this.branchClient = branchClient;
+        this.imageStorageService = imageStorageService;
+    }
 
     @Transactional
-    public CustomerResponse createCustomer(CustomerOnboardingRequest request, List<MultipartFile> files) throws IOException {
+    public CustomerResponse createCustomer(CustomerOnboardingRequest request, MultipartFile image) {
 
-        // 1. Validate duplicate customer
         validateDuplicateCustomer(request);
 
-        // 2. Validate KYC
-        if (request.getKyc() == null) {
-            throw new IllegalArgumentException("KYC information is required");
+        // Validate branch existence and ACTIVE status
+        if (request.getBranchCode() == null || request.getBranchCode().isBlank()) {
+            throw new IllegalArgumentException("Branch code is required for onboarding");
         }
 
-        if (request.getKyc().getDocuments() == null || request.getKyc().getDocuments().isEmpty()) {
-
-            throw new IllegalArgumentException("At least one KYC document is required");
+        BranchResponse branch;
+        try {
+            branch = branchClient.getBranchById(request.getBranchCode());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Branch not found with code: " + request.getBranchCode());
         }
 
-        // 3. Validate uploaded files
-        if (files == null || files.size() != request.getKyc().getDocuments().size()) {
-
-            throw new IllegalArgumentException("Number of uploaded files must match number of KYC documents");
+        if (branch == null || !"ACTIVE".equalsIgnoreCase(branch.getStatus())) {
+            throw new IllegalStateException("Cannot onboard customer. Branch is " + (branch == null ? "unknown" : branch.getStatus()));
         }
 
-        // 4. Check duplicate document numbers
-        for (KycDocumentRequest documentRequest : request.getKyc().getDocuments()) {
-
-            if (kycDocumentRepository.existsByDocumentNumber(documentRequest.getDocumentNumber())) {
-
-                throw new DuplicateDocumentException("Document is already registered: " + documentRequest.getDocumentType());
-            }
-        }
-
-        // 5. Generate customer ID
         String customerId = generateCustomerId();
+        String imageFileName = imageStorageService.storeImage(image, customerId);
 
-        // 6. Create Customer
         Customer customer = Customer.builder()
                 .customerId(customerId)
                 .title(request.getTitle())
-                .firstName(request.getFirstName())
-                .middleName(request.getMiddleName())
-                .lastName(request.getLastName())
+                .name(request.getName())
                 .dateOfBirth(request.getDateOfBirth())
                 .gender(request.getGender())
+                // Use authoritative branch info from Branch Service
+                .branchName(branch.getBranchName())
+                .branchCode(branch.getBranchCode())
+                .ifscCode(branch.getIfscCode())
+                .openingBalance(request.getOpeningBalance())
                 .nationality(request.getNationality())
                 .maritalStatus(request.getMaritalStatus())
                 .email(request.getEmail())
                 .mobileNumber(request.getMobileNumber())
                 .alternateMobileNumber(request.getAlternateMobileNumber())
                 .permanentAddress(request.getPermanentAddress())
-                .permanentCity(request.getPermanentCity()).
-                permanentState(request.getPermanentState())
+                .permanentCity(request.getPermanentCity())
+                .permanentState(request.getPermanentState())
                 .permanentCountry(request.getPermanentCountry())
                 .permanentPinCode(request.getPermanentPinCode())
+                .profileImageUrl(imageFileName)
                 .communicationAddress(request.getCommunicationAddress())
                 .communicationCity(request.getCommunicationCity())
                 .communicationState(request.getCommunicationState())
@@ -102,171 +108,36 @@ public class CustomerService {
                 .language(request.getLanguage())
                 .accountType(request.getAccountType())
                 .currency(request.getCurrency())
-                .build();
-
-        Customer savedCustomer = customerRepository.save(customer);
-
-
-        // 7. Check whether KYC already exists
-        if (kycRepository.existsByCustomerId(savedCustomer.getCustomerId())) {
-
-            throw new KycAlreadyExistsException("KYC already exists for customer: " + savedCustomer.getCustomerId());
-        }
-
-
-        // 8. Create KYC
-        Kyc kyc = Kyc.builder().
-                kycId(generateKycId())
-                .customerId(savedCustomer.getCustomerId())
-                .kycType(request.getKyc().getKycType())
-                .kycVerificationStatus(KycVerificationStatus.PENDING)
+                .status(CustomerStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        Kyc savedKyc = kycRepository.save(kyc);
-
-
-
-        // 9. Create upload folder
-        Path folder = Paths.get(folderPath.toUri());
-
-        if (!Files.exists(folder)) {
-            Files.createDirectories(folder);
-        }
-
-
-        // 10. Save each KYC document
-        for (int i = 0; i < request.getKyc().getDocuments().size(); i++) {
-
-            KycDocumentRequest documentRequest = request.getKyc().getDocuments().get(i);
-
-            MultipartFile uploadedFile = files.get(i);
-
-
-            // Validate file
-            if (uploadedFile == null || uploadedFile.isEmpty()) {
-
-                throw new IllegalArgumentException("File is required for " + documentRequest.getDocumentType());
-            }
-
-
-            // Get original filename
-            String originalFileName = uploadedFile.getOriginalFilename();
-
-
-            // Extract extension
-            String extension = "";
-
-            if (originalFileName != null && originalFileName.contains(".")) {
-
-                extension = originalFileName.substring(originalFileName.lastIndexOf("."));
-            }
-
-
-            // Generate secure storage filename
-            String storedFileName = UUID.randomUUID() + extension;
-
-
-            Path filePath = folder.resolve(storedFileName);
-
-
-            // Save physical file
-            Files.copy(uploadedFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-
-            // Create KYC document
-            String contentType = uploadedFile.getContentType();
-
-            KycDocument document = KycDocument.builder()
-                    .documentId(generateDocumentId())
-                    .kycId(savedKyc.getKycId())
-                    .documentType(documentRequest.getDocumentType())
-                    .documentNumber(documentRequest.getDocumentNumber())
-                    .fileName(originalFileName)
-                    .fileUrl(filePath.toString())
-                    .contentType(contentType)
-                    .verificationStatus(KycDocumentVerificationStatus.PENDING)
-                    .build();
-            KycDocument save = kycDocumentRepository.save(document);
-        }
-        List<KycDocument> kycDocuments = kycDocumentRepository.findByKycId(savedKyc.getKycId());
-        List<KycDocumentResponse> listKycDocument = kycDocuments.stream().map(kycDocument -> mapToResponseDocument(kycDocument)).toList();
-
-        KycResponse kycResponse = mapToResponseKyc(savedKyc,listKycDocument);
-
-
-        // 12. Return response
-        return mapToResponse(savedCustomer, kycResponse);
-    }
-    private String generateDocumentId() {
-        return "DOC-" + UUID.randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 12)
-                .toUpperCase();
-    }
-    private KycResponse mapToResponseKyc(Kyc kyc,List<KycDocumentResponse> kycDocuments) {
-
-        return KycResponse.builder()
-                .kycId(kyc.getKycId())
-                .customerId(kyc.getCustomerId())
-                .kycType(kyc.getKycType())
-                .kycVerificationStatus(kyc.getKycVerificationStatus())
-                .reviewerId(kyc.getReviewerId())
-                .rejectionReason(kyc.getRejectionReason())
-                .verifiedAt(kyc.getVerifiedAt())
-                .createdAt(kyc.getCreatedAt())
-                .updatedAt(kyc.getUpdatedAt())
-                .kycDocument(kycDocuments)
-                .build();
-    }
-    private KycDocumentResponse mapToResponseDocument(KycDocument document) {
-
-        return KycDocumentResponse.builder()
-                .documentId(document.getDocumentId())
-                .kycId(document.getKycId())
-                .documentType(document.getDocumentType())
-                .documentNumber(document.getDocumentNumber())
-                .fileName(document.getFileName())
-                .fileUrl(AppConstant.BASE_URL + "/api/v1/customers/kyc/documents/" + document.getDocumentId())
-                .kycVerificationStatus(document.getVerificationStatus())
-                .uploadedAt(document.getUploadedAt())
-                .verifiedAt(document.getVerifiedAt())
-                .build();
+        Customer savedCustomer = customerRepository.save(customer);
+        return mapToResponse(savedCustomer);
     }
 
     private void validateDuplicateCustomer(CustomerOnboardingRequest request) {
-
         if (customerRepository.existsByMobileNumber(request.getMobileNumber())) {
-
             throw new IllegalArgumentException("Customer already exists with mobile number");
         }
-
         if (request.getEmail() != null && customerRepository.existsByEmail(request.getEmail())) {
-
             throw new IllegalArgumentException("Customer already exists with email");
         }
     }
 
     private String generateCustomerId() {
-
         return "CUST-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
-    private String generateKycId() {
-
-        return "KYC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
-
-    private CustomerResponse mapToResponse(Customer customer, KycResponse kycResponse) {
-
+    private CustomerResponse mapToResponse(Customer customer) {
         return new CustomerResponse(
                 customer.getCustomerId(),
                 customer.getTitle(),
-                customer.getFirstName(),
-                customer.getMiddleName(),
-                customer.getLastName(),
+                customer.getName(),
+                customer.getBranchName(),
+                customer.getBranchCode(),
+                customer.getIfscCode(),
                 customer.getDateOfBirth(),
                 customer.getGender(),
                 customer.getNationality(),
@@ -280,295 +151,361 @@ public class CustomerService {
                 customer.getPermanentCountry(),
                 customer.getPermanentPinCode(),
                 customer.getCommunicationAddress(),
-                customer.getCommunicationCity(), customer.getCommunicationState(),
+                customer.getCommunicationCity(),
+                customer.getCommunicationState(),
                 customer.getCommunicationCountry(),
-                customer.getCommunicationPinCode(), customer.getOccupation(),
-                customer.getAnnualIncome(), customer.getSourceOfIncome(),
-                customer.getLanguage(), customer.getStatus(), customer.getCreatedAt(),
+                customer.getCommunicationPinCode(),
+                customer.getOccupation(),
+                customer.getAnnualIncome(),
+                customer.getSourceOfIncome(),
+                customer.getLanguage(),
+                customer.getStatus(),
+                customer.getCreatedAt(),
                 customer.getUpdatedAt(),
-                kycResponse
-
+                customer.getOpeningBalance(),
+                customer.getProfileImageUrl()
         );
-
     }
 
     @Transactional(readOnly = true)
     public PageResponse<CustomerResponse> getAllCustomers(int page, int size, String sortBy, String sortDir) {
-        if (page < 0) {
-            throw new IllegalArgumentException("Page number cannot be negative");
-        }
-
-        if (size < 1 || size > 100) {
-            throw new IllegalArgumentException("Page size must be between 1 and 100");
-        }
-
-
+        if (page < 0) throw new IllegalArgumentException("Page number cannot be negative");
+        if (size < 1 || size > 100) throw new IllegalArgumentException("Page size must be between 1 and 100");
         if (!sortDir.equalsIgnoreCase("asc") && !sortDir.equalsIgnoreCase("desc")) {
-
             throw new IllegalArgumentException("Sort direction must be 'asc' or 'desc'");
         }
 
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
 
         PageRequest pageRequest = PageRequest.of(page, size, sort);
-
         Page<Customer> customerPage = customerRepository.findAll(pageRequest);
-
-        Page<CustomerResponse> responsePage = customerPage.map(customer -> mapToResponse(customer, null));
-
+        Page<CustomerResponse> responsePage = customerPage.map(this::mapToResponse);
         return PageResponse.fromPage(responsePage);
     }
 
-    // update customer
+    @Transactional(readOnly = true)
+    public PageResponse<CustomerResponse> getCustomersByBranch(
+            String branchId, int page, int size, String sortBy, String sortDir) {
+        validateCustomerPage(page, size, sortBy, sortDir);
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+        List<String> customerIds = accountClient.getCustomerIdsByBranchId(branchId);
+        Page<Customer> customers = customerIds.isEmpty()
+                ? Page.empty(pageRequest)
+                : customerRepository.findByCustomerIdIn(customerIds, pageRequest);
+        return PageResponse.fromPage(customers.map(this::mapToResponse));
+    }
+
+    public CustomerResponse getCustomerByCustomerIdForBranch(String customerId, String branchId) {
+        requireCustomerInBranch(customerId, branchId);
+        return getCustomerByCustomerId(customerId);
+    }
+
+    @Transactional
+    public CustomerResponse updateCustomerForBranch(String customerId, UpdateCustomerRequest request, String branchId) {
+        requireCustomerInBranch(customerId, branchId);
+        return updateCustomer(customerId, request);
+    }
+
+    @Transactional
+    public CustomerResponse updateCustomerStatusForBranch(
+            String customerId, UpdateCustomerStatusRequest request, String branchId) {
+        requireCustomerInBranch(customerId, branchId);
+        return updateCustomerStatus(customerId, request);
+    }
+
+    @Transactional
+    public CustomerResponse closeCustomerForBranch(String customerId, String branchId) {
+        requireCustomerInBranch(customerId, branchId);
+        return closeCustomer(customerId);
+    }
+
+    private void requireCustomerInBranch(String customerId, String branchId) {
+        if (branchId == null || branchId.isBlank()
+                || !accountClient.getCustomerIdsByBranchId(branchId).contains(customerId)) {
+            throw new AccessDeniedException("You can only manage customers with accounts at your assigned branch");
+        }
+    }
+
+    private void validateCustomerPage(int page, int size, String sortBy, String sortDir) {
+        if (page < 0) throw new IllegalArgumentException("Page number cannot be negative");
+        if (size < 1 || size > 100) throw new IllegalArgumentException("Page size must be between 1 and 100");
+        if (sortBy == null || sortBy.isBlank()) throw new IllegalArgumentException("Sort field is required");
+        if (!sortDir.equalsIgnoreCase("asc") && !sortDir.equalsIgnoreCase("desc")) {
+            throw new IllegalArgumentException("Sort direction must be 'asc' or 'desc'");
+        }
+    }
+
     @Transactional
     public CustomerResponse updateCustomer(String customerId, UpdateCustomerRequest request) {
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
 
-        // Find existing customer
-        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
-        // Check duplicate email
-        if (request.email() != null && !request.email().equalsIgnoreCase(customer.getEmail()) && customerRepository.existsByEmail(request.email())) {
+        if (request.email() != null
+                && !request.email().equalsIgnoreCase(customer.getEmail())
+                && customerRepository.existsByEmail(request.email())) {
             throw new CustomerAlreadyExistsException("Customer with email already exists");
         }
-        // Check duplicate mobile number
-        if (request.mobileNumber() != null && !request.mobileNumber().equals(customer.getMobileNumber()) && customerRepository.existsByMobileNumber(request.mobileNumber())) {
-
+        if (request.mobileNumber() != null
+                && !request.mobileNumber().equals(customer.getMobileNumber())
+                && customerRepository.existsByMobileNumber(request.mobileNumber())) {
             throw new CustomerAlreadyExistsException("Customer with mobile number already exists");
         }
-        // Update only fields supplied by the client
-        if (request.title() != null) {
-            customer.setTitle(request.title());
-        }
 
-        if (request.firstName() != null) {
-            customer.setFirstName(request.firstName());
-        }
-
-        if (request.middleName() != null) {
-            customer.setMiddleName(request.middleName());
-        }
-
-        if (request.lastName() != null) {
-            customer.setLastName(request.lastName());
-        }
-
-        if (request.nationality() != null) {
-            customer.setNationality(request.nationality());
-        }
-
-        if (request.maritalStatus() != null) {
-            customer.setMaritalStatus(request.maritalStatus());
-        }
-
-        if (request.email() != null) {
-            customer.setEmail(request.email());
-        }
-
-        if (request.mobileNumber() != null) {
-            customer.setMobileNumber(request.mobileNumber());
-        }
-
-        if (request.alternateMobileNumber() != null) {
-            customer.setAlternateMobileNumber(request.alternateMobileNumber());
-        }
-
-        if (request.permanentAddress() != null) {
-            customer.setPermanentAddress(request.permanentAddress());
-        }
-
-        if (request.permanentCity() != null) {
-            customer.setPermanentCity(request.permanentCity());
-        }
-
-        if (request.permanentState() != null) {
-            customer.setPermanentState(request.permanentState());
-        }
-
-        if (request.permanentCountry() != null) {
-            customer.setPermanentCountry(request.permanentCountry());
-        }
-
-        if (request.permanentPinCode() != null) {
-            customer.setPermanentPinCode(request.permanentPinCode());
-        }
-
-        if (request.communicationAddress() != null) {
-            customer.setCommunicationAddress(request.communicationAddress());
-        }
-
-        if (request.communicationCity() != null) {
-            customer.setCommunicationCity(request.communicationCity());
-        }
-
-        if (request.communicationState() != null) {
-            customer.setCommunicationState(request.communicationState());
-        }
-
-        if (request.communicationCountry() != null) {
-            customer.setCommunicationCountry(request.communicationCountry());
-        }
-
-        if (request.communicationPinCode() != null) {
-            customer.setCommunicationPinCode(request.communicationPinCode());
-        }
-
-
-        if (request.occupation() != null) {
-            customer.setOccupation(request.occupation());
-        }
-
-        if (request.annualIncome() != null) {
-            customer.setAnnualIncome(request.annualIncome());
-        }
-
-        if (request.sourceOfIncome() != null) {
-            customer.setSourceOfIncome(request.sourceOfIncome());
-        }
-
-        if (request.language() != null) {
-            customer.setLanguage(request.language());
-        }
+        if (request.title() != null) customer.setTitle(request.title());
+        if (request.name() != null) customer.setName(request.name());
+        if (request.nationality() != null) customer.setNationality(request.nationality());
+        if (request.maritalStatus() != null) customer.setMaritalStatus(request.maritalStatus());
+        if (request.email() != null) customer.setEmail(request.email());
+        if (request.mobileNumber() != null) customer.setMobileNumber(request.mobileNumber());
+        if (request.alternateMobileNumber() != null) customer.setAlternateMobileNumber(request.alternateMobileNumber());
+        if (request.permanentAddress() != null) customer.setPermanentAddress(request.permanentAddress());
+        if (request.permanentCity() != null) customer.setPermanentCity(request.permanentCity());
+        if (request.permanentState() != null) customer.setPermanentState(request.permanentState());
+        if (request.permanentCountry() != null) customer.setPermanentCountry(request.permanentCountry());
+        if (request.permanentPinCode() != null) customer.setPermanentPinCode(request.permanentPinCode());
+        if (request.communicationAddress() != null) customer.setCommunicationAddress(request.communicationAddress());
+        if (request.communicationCity() != null) customer.setCommunicationCity(request.communicationCity());
+        if (request.communicationState() != null) customer.setCommunicationState(request.communicationState());
+        if (request.communicationCountry() != null) customer.setCommunicationCountry(request.communicationCountry());
+        if (request.communicationPinCode() != null) customer.setCommunicationPinCode(request.communicationPinCode());
+        if (request.occupation() != null) customer.setOccupation(request.occupation());
+        if (request.annualIncome() != null) customer.setAnnualIncome(request.annualIncome());
+        if (request.sourceOfIncome() != null) customer.setSourceOfIncome(request.sourceOfIncome());
+        if (request.language() != null) customer.setLanguage(request.language());
+        if (request.accountType() != null) customer.setAccountType(request.accountType());
+        if (request.dateOfBirth() != null) customer.setDateOfBirth(request.dateOfBirth());
+        if (request.currency() != null) customer.setCurrency(request.currency());
 
         Customer updatedCustomer = customerRepository.save(customer);
-
-        return mapToResponse(updatedCustomer, null);
+        return mapToResponse(updatedCustomer);
     }
 
     private void validateStatusTransition(CustomerStatus currentStatus, CustomerStatus newStatus) {
-
         switch (currentStatus) {
-            case PENDING -> {
-                if (newStatus != CustomerStatus.ACTIVE) {
-                    throw new IllegalStateException("PENDING customer can only become ACTIVE");
-                }
-            }
-
+            case PENDING -> throw new IllegalStateException(
+                    "Pending customers can only become active after KYC approval");
             case ACTIVE -> {
-                if (newStatus != CustomerStatus.INACTIVE && newStatus != CustomerStatus.BLOCKED && newStatus != CustomerStatus.CLOSED) {
-
+                if (newStatus != CustomerStatus.INACTIVE
+                        && newStatus != CustomerStatus.BLOCKED
+                        && newStatus != CustomerStatus.CLOSED) {
                     throw new IllegalStateException("ACTIVE customer can only become INACTIVE, BLOCKED or CLOSED");
                 }
             }
-
             case INACTIVE -> {
                 if (newStatus != CustomerStatus.ACTIVE && newStatus != CustomerStatus.CLOSED) {
-
                     throw new IllegalStateException("INACTIVE customer can only become ACTIVE or CLOSED");
                 }
             }
-
             case BLOCKED -> {
                 if (newStatus != CustomerStatus.ACTIVE && newStatus != CustomerStatus.CLOSED) {
-
                     throw new IllegalStateException("BLOCKED customer can only become ACTIVE or CLOSED");
                 }
             }
-
-            case CLOSED -> {
-                throw new IllegalStateException("CLOSED customer cannot change status");
-            }
+            case CLOSED -> throw new IllegalStateException("CLOSED customer cannot change status");
         }
     }
 
     @Transactional
     public CustomerResponse updateCustomerStatus(String customerId, UpdateCustomerStatusRequest request) {
-
-        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
-
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
         CustomerStatus currentStatus = customer.getStatus();
         CustomerStatus newStatus = request.getStatus();
-
-        if (newStatus == CustomerStatus.ACTIVE) {
-
-            try {
-                Kyc kyc = kycRepository.findByCustomerId(customer.getCustomerId()).orElseThrow(() -> new CustomerNotFoundException("kyc not found :" + customer.getCustomerId()));
-
-
-                if (!"APPROVED".equalsIgnoreCase(kyc.getKycVerificationStatus().toString())) {
-
-                    throw new InvalidCustomerStatusTransitionException("Customer cannot become ACTIVE because KYC is not APPROVED");
-                }
-
-            } catch (KycNotFoundException ex) {
-
-                throw new KycNotFoundException("KYC record not found for customer: " + customerId);
-            }
-        }
-
         validateStatusTransition(currentStatus, newStatus);
-
         customer.setStatus(newStatus);
-
         Customer updatedCustomer = customerRepository.save(customer);
-
-        return mapToResponse(updatedCustomer, null);
+        return mapToResponse(updatedCustomer);
     }
 
     public CustomerResponse getCustomerByCustomerId(String customerId) {
-        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("customer not found: " + customerId));
-        return mapToResponse(customer, null);
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("customer not found: " + customerId));
+        return mapToResponse(customer);
     }
 
     public CustomerResponse closeCustomer(String customerId) {
-        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("customer not found:" + customerId));
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("customer not found:" + customerId));
         customer.setStatus(CustomerStatus.CLOSED);
         Customer save = customerRepository.save(customer);
-        return mapToResponse(save, null);
+        return mapToResponse(save);
     }
 
     public Object getCustomerByEmail(String email, Authentication authentication) {
-
-        Customer customer = customerRepository.findByEmail(email).orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + email));
+        Customer customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + email));
 
         if (!customer.getEmail().equals(authentication.getName())) {
             throw new EmailMissMatch("Login email and provided email do not match: " + email);
         }
-
         if (customer.getStatus() != CustomerStatus.ACTIVE) {
             return "Kyc is pending";
         }
-
-        AccountResponse accountByCustomerId = accountClient.getAccountByCustomerId(customer.getCustomerId());
-
+        List<AccountResponse> accounts = accountClient.getAccountsByCustomerId(customer.getCustomerId());
         return CustomerAccountResponse.builder()
-                .account(accountByCustomerId)
+                .account(accounts.isEmpty() ? null : accounts.get(0))
+                .accounts(accounts)
                 .build();
     }
 
     public @Nullable CustomerResponse getCustomerByMobile(String mobileNumber) {
-        Customer customer = customerRepository.findByMobileNumber(mobileNumber).orElseThrow(() -> new CustomerNotFoundException("Customer not found:" + mobileNumber));
-        return mapToResponse(customer, null);
-    }
-
-    public void statusUpdate(String customerId) {
-        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("Customer not found :" + customerId));
-        customer.setStatus(CustomerStatus.ACTIVE);
-        customerRepository.save(customer);
+        Customer customer = customerRepository.findByMobileNumber(mobileNumber)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found:" + mobileNumber));
+        return mapToResponse(customer);
     }
 
     @Transactional(readOnly = true)
     public CustomerEligibilityResponse getAccountEligibility(String customerId) {
-
-        // 1. Find customer
-        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
-
-        // 2. Find KYC
-        Kyc kyc = kycRepository.findByCustomerId(customerId).orElseThrow(() -> new KycNotFoundException("KYC record not found for customer: " + customerId));
-
-        // 3. Check customer status
-        boolean customerActive = customer.getStatus() == CustomerStatus.ACTIVE;
-
-        // 4. Check KYC status
-        boolean kycApproved = kyc.getKycVerificationStatus() == KycVerificationStatus.APPROVED;
-
-        // 5. Both conditions must be true
-        boolean eligible = customerActive && kycApproved;
-
-        // 6. Return only required information
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
+        boolean eligible = customer.getStatus() == CustomerStatus.ACTIVE;
         return CustomerEligibilityResponse.builder()
                 .customerId(customer.getCustomerId())
                 .customerStatus(customer.getStatus())
-                .kycStatus(kyc.getKycVerificationStatus())
                 .eligible(eligible)
                 .build();
+    }
+
+    @Transactional
+    public void activateCustomerAfterKycApproval(String customerId) {
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
+
+        if (customer.getStatus() == CustomerStatus.PENDING) {
+            customer.setStatus(CustomerStatus.ACTIVE);
+            customerRepository.save(customer);
+        } else if (customer.getStatus() != CustomerStatus.ACTIVE) {
+            throw new IllegalStateException("Cannot open an account for a " + customer.getStatus() + " customer");
+        }
+    }
+
+    public AccountResponse openAccountAfterKycApproval(String customerId, String preferredBranchCode) {
+
+        String branchCode = preferredBranchCode;
+
+        if (branchCode.isBlank()) {
+            throw new IllegalStateException(" branch is not configured");
+        }
+
+        Customer customer = customerRepository.findByCustomerId(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found: " + customerId));
+
+        if (customer.getStatus() != CustomerStatus.PENDING
+                && customer.getStatus() != CustomerStatus.ACTIVE) {
+            throw new IllegalStateException("Cannot open an account for a " + customer.getStatus() + " customer");
+        }
+
+        CreateAccountRequest request = CreateAccountRequest.builder()
+                .customerId(customer.getCustomerId())
+                .accountType(customer.getAccountType())
+                .balance(customer.getOpeningBalance())
+                .currency(customer.getCurrency())
+                .branchCode(branchCode)
+                .name(customer.getName())
+                .email(customer.getEmail())
+                .mobileNumber(customer.getMobileNumber())
+                .build();
+
+        return accountClient.openAccountAfterKycApproval(request);
+    }
+
+    public CustomerResponse getMyProfile(Authentication authentication) {
+        String email = authentication.getName();
+        Customer customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomerNotFoundException("Customer not found"));
+        return mapToResponse(customer);
+    }
+
+    public Page<CustomerResponse> allCustomerBranch(String branchCode, int page, int size) {
+        Page<Customer> createdAt = customerRepository.findByBranchCode(branchCode, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        Page<CustomerResponse> responsePage = createdAt.map(customer -> mapToResponse(customer));
+        return responsePage;
+    }
+
+    public CustomerResponse updateCustomerProfile(CustomerUpdatedRequest request, Authentication authentication) {
+        String email = authentication.getName();
+        System.out.println(email);
+        Customer customer = customerRepository.findByEmail(email).orElseThrow(() -> new CustomerNotFoundException("Customer not found"));
+
+        if (request.getMobileNumber() != null) {
+            customer.setMobileNumber(request.getMobileNumber());
+        }
+        if (request.getAlternateMobileNumber() != null) {
+            customer.setAlternateMobileNumber(request.getAlternateMobileNumber());
+        }
+        if (request.getPermanentAddress() != null) {
+            customer.setPermanentAddress(request.getPermanentAddress());
+        }
+        if (request.getPermanentCity() != null) {
+            customer.setPermanentCity(request.getPermanentCity());
+        }
+        if (request.getPermanentState() != null) {
+            customer.setPermanentState(request.getPermanentState());
+        }
+        if (request.getPermanentCountry() != null) {
+            customer.setPermanentCountry(request.getPermanentCountry());
+        }
+        if (request.getPermanentPinCode() != null) {
+            customer.setPermanentPinCode(request.getPermanentPinCode());
+        }
+        if (request.getCommunicationAddress() != null) {
+            customer.setCommunicationAddress(request.getCommunicationAddress());
+        }
+        if (request.getCommunicationCity() != null) {
+            customer.setCommunicationCity(request.getCommunicationCity());
+        }
+        if (request.getCommunicationState() != null) {
+            customer.setCommunicationState(request.getCommunicationState());
+        }
+        if (request.getCommunicationCountry() != null) {
+            customer.setCommunicationCountry(request.getCommunicationCountry());
+        }
+        if (request.getCommunicationPinCode() != null) {
+            customer.setCommunicationPinCode(request.getCommunicationPinCode());
+        }
+        if (request.getOccupation() != null) {
+            customer.setOccupation(request.getOccupation());
+
+        }
+        Customer save = customerRepository.save(customer);
+        return mapToResponse(save);
+    }
+
+
+    public ResponseEntity<Resource> getCustomerImage(String customerId) throws MalformedURLException {
+
+        Customer customer = customerRepository.findByCustomerId(customerId).orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        String imageName = customer.getProfileImageUrl();
+
+        if (imageName == null || imageName.isBlank()) {
+            throw new RuntimeException("Customer image not found");
+        }
+
+        Path imagePath = Paths.get(customerUploadDirectory).resolve(imageName).normalize();
+
+        if (!imagePath.startsWith(Paths.get(customerUploadDirectory).normalize())
+                || !Files.exists(imagePath)) {
+            throw new RuntimeException("Customer image not found");
+        }
+
+        Resource resource = new UrlResource(imagePath.toUri());
+
+        try {
+            String contentType = Files.probeContentType(imagePath);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(
+                            contentType != null ? contentType : "application/octet-stream"))
+                    .body(resource);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to access customer image", e);
+        }
     }
 }

@@ -28,6 +28,7 @@ public class Transaction {
 
     @Column(name = "transaction_id", nullable = false, unique = true, length = 40)
     private String transactionId;
+    private String accountHolderName;
 
     @Column(name = "account_number", length = 20)
     private String accountNumber;
@@ -41,12 +42,17 @@ public class Transaction {
     @Column(name = "customer_id", nullable = false, length = 30)
     private String customerId;
 
+    @Column(name = "branchCode", length = 30)
+    private String branchCode;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "transaction_type", nullable = false, length = 20)
     private TransactionType transactionType;
 
     @Column(name = "amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
+
+    private BigDecimal availableBalance;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
@@ -60,6 +66,9 @@ public class Transaction {
 
     @Column(name = "description", length = 255)
     private String description;
+
+    @Column(name = "performed_by", length = 100)
+    private String performedBy;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

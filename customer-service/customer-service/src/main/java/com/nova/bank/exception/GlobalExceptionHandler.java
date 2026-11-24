@@ -34,27 +34,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(KycNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleKycNotFound(KycNotFoundException ex, HttpServletRequest request) {
-
-        ErrorResponse response = new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "KYC Not Found", ex.getMessage(), request.getRequestURI());
-
-        return ResponseEntity.badRequest().body(response);
-    }
-
-    @ExceptionHandler(KycAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponse> handleKycAlreadyExists(KycAlreadyExistsException exception, HttpServletRequest request) {
-
-        ErrorResponse kycAlreadyExists = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.CONFLICT.value())
-                .error("KYC_ALREADY_EXISTS")
-                .message(exception.getMessage())
-                .path(request.getRequestURI())
-                .build();
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(kycAlreadyExists);
-    }
 
     @ExceptionHandler(DuplicateDocumentException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateDocument(DuplicateDocumentException exception, HttpServletRequest request) {

@@ -1,9 +1,13 @@
 package com.nova.bank.account.controllers;
 
 import com.nova.bank.account.dto.AccountResponse;
+import com.nova.bank.account.dto.LoanBalanceRequest;
+import com.nova.bank.account.dto.LoanBalanceResponse;
+import com.nova.bank.account.dto.response.WithDrawResponse;
 import com.nova.bank.account.services.AccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 
@@ -17,20 +21,38 @@ public class InternalAccountController {
         this.accountService = accountService;
     }
 
+    @PreAuthorize("hasAnyRole('TELLER','BRANCH_MANAGER','ADMIN')")
     @PostMapping("/credit/{accountNumber}")
-    public ResponseEntity<AccountResponse> creditAccount(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
+    public ResponseEntity<AccountResponse> creditAccount(
+            @PathVariable String accountNumber, @RequestParam BigDecimal amount, Authentication authentication) {
 
         AccountResponse response = accountService.creditAccount(accountNumber, amount);
 
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasRole('TELLER')")
+    @PreAuthorize("hasAnyRole('TELLER','BRANCH_MANAGER','ADMIN')")
     @PostMapping("/debit/{accountNumber}")
-    public ResponseEntity<AccountResponse> debitAccount(@PathVariable String accountNumber, @RequestParam BigDecimal amount) {
+    public ResponseEntity<WithDrawResponse> debitAccount(
+            @PathVariable String accountNumber, @RequestParam BigDecimal amount, Authentication authentication) {
 
-        AccountResponse response = accountService.debitAccount(accountNumber, amount);
+        WithDrawResponse withDrawResponse = accountService.debitAccount(accountNumber, amount);
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(withDrawResponse);
     }
+
+    @PreAuthorize("hasAnyRole('ADMIN','LOAN_OFFICER','BRANCH_MANAGER')")
+    @PostMapping("/loan-disbursement")
+    public ResponseEntity<LoanBalanceResponse> creditLoanDisbursement(
+            @RequestBody @jakarta.validation.Valid LoanBalanceRequest request) {
+        return ResponseEntity.ok(accountService.creditLoanDisbursement(request));
+    }
+
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @PostMapping("/loan-payment")
+    public ResponseEntity<LoanBalanceResponse> debitLoanPayment(
+            @RequestBody @jakarta.validation.Valid LoanBalanceRequest request) {
+        return ResponseEntity.ok(accountService.debitLoanPayment(request));
+    }
+
 }

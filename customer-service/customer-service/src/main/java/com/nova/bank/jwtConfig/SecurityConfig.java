@@ -30,7 +30,7 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers("/actuator/**")
+                        .requestMatchers("/actuator/**","/api/v1/customers/create")
                         .permitAll()
                         .anyRequest()
                         .authenticated()

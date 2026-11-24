@@ -1,6 +1,9 @@
 package com.nova.bank.transaction.clients;
 
+import com.nova.bank.transaction.clients.response.WithDrawResponse;
 import com.nova.bank.transaction.dto.AccountResponse;
+import com.nova.bank.transaction.dto.CreateTransferRequest;
+import com.nova.bank.transaction.dto.CustomerTransferAccountResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,5 +19,8 @@ public interface AccountClient {
     AccountResponse creditAccount(@PathVariable("accountNumber") String accountNumber, @RequestParam("amount") BigDecimal amount);
 
     @PostMapping("/api/v1/accounts/internal/debit/{accountNumber}")
-    AccountResponse debitAccount(@PathVariable("accountNumber") String accountNumber, @RequestParam("amount") BigDecimal amount);
+    WithDrawResponse debitAccount(@PathVariable("accountNumber") String accountNumber, @RequestParam("amount") BigDecimal amount);
+
+    @PostMapping("/api/v1/accounts/customer-transfer")
+    CustomerTransferAccountResponse transferForCurrentCustomer(@RequestBody CreateTransferRequest request);
 }

@@ -18,9 +18,9 @@ import java.util.Map;
 public class JwtHelper {
 
 
-    private static final long ACCESS_TOKEN_VALIDITY =5*60*1000;
+    private static final long ACCESS_TOKEN_VALIDITY =60*60*1000;
 
-    private static final long REFRESH_TOKEN_VALIDITY=30*60*1000;
+    private static final long REFRESH_TOKEN_VALIDITY=12 * 60 * 60 * 1000;
 
     @Value("${jwt.secret}")
     private String SECRET_KEY;
@@ -46,6 +46,7 @@ public class JwtHelper {
         Map<String,Object> claims=new HashMap<>();
         claims.put("token_type","refresh_token");
         claims.put("roles",userDetails.getAuthorities());
+
         return buildToken(claims,userDetails.getUsername(),REFRESH_TOKEN_VALIDITY);
     }
     // check it is refresh token
@@ -74,6 +75,7 @@ public class JwtHelper {
                 .signWith(key,Jwts.SIG.HS256)
                 .compact();
     }
+
 
     // get userName from token
 

@@ -1,6 +1,7 @@
 package com.nova.bank.account.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,7 +19,8 @@ public class CreateBranchRequest {
     private String branchName;
 
     @NotBlank(message = "IFSC is required")
-    @Size(min = 4, max = 6, message = "IFSC must be exactly 11 characters")
+    @Size(min = 5, max = 11, message = "IFSC must be between 5 and 11 characters")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]+$", message = "IFSC must contain letters and numbers only")
     private String ifsc;
 
     @NotBlank(message = "Address is required")
@@ -40,4 +42,5 @@ public class CreateBranchRequest {
     @NotBlank(message = "Postal code is required")
     @Size(max = 10, message = "Postal code must not exceed 10 characters")
     private String pinCode;
+
 }

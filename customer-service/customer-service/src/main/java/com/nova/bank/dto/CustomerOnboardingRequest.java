@@ -17,6 +17,10 @@ public class CustomerOnboardingRequest {
 
     @NotNull(message = "Account type is required")
     private AccountType accountType;
+    private String branchCode;
+    private String branchName;
+    private String ifscCode;
+    private BigDecimal openingBalance;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
@@ -25,15 +29,8 @@ public class CustomerOnboardingRequest {
     private Title title;
 
     @NotBlank(message = "First name is required")
-    @Size(max = 50, message = "First name must not exceed 50 characters")
-    private String firstName;
-
-    @Size(max = 50, message = "Middle name must not exceed 50 characters")
-    private String middleName;
-
-    @NotBlank(message = "Last name is required")
-    @Size(max = 50, message = "Last name must not exceed 50 characters")
-    private String lastName;
+    @Size(max = 50, message = "name must not exceed 50 characters")
+    private String name;
 
     @NotNull(message = "Date of birth is required")
     @Past(message = "Date of birth must be in the past")
@@ -46,21 +43,22 @@ public class CustomerOnboardingRequest {
     @Size(max = 50, message = "Nationality must not exceed 50 characters")
     private String nationality;
 
+    @NotBlank
     private MaritalStatus maritalStatus;
 
     @Email(message = "Invalid email format")
-    @Size(max = 100, message = "Email must not exceed 100 characters")
+    @Size(max = 100, message = "Email must not exceed 20 characters")
     private String email;
 
     @Pattern(
-            regexp = "^[0-9]{10,15}$",
-            message = "Mobile number must contain 10 to 15 digits"
+            regexp = "^[0-9]{10}$",
+            message = "Mobile number must contain 10 digit"
     )
     private String mobileNumber;
 
     @Pattern(
-            regexp = "^[0-9]{10,15}$",
-            message = "Alternate mobile number must contain 10 to 15 digits"
+            regexp = "^[0-9]{10}$",
+            message = "Alternate mobile number must contain 10 digits"
     )
     private String alternateMobileNumber;
 
@@ -120,13 +118,10 @@ public class CustomerOnboardingRequest {
     )
     private BigDecimal annualIncome;
 
+    @NotBlank
     private SourceOfIncome sourceOfIncome;
 
     @Size(max = 30, message = "Language must not exceed 30 characters")
     private String language;
-
-    @Valid
-    @NotNull(message = "KYC information is required")
-    private KycRequest kyc;
 
 }

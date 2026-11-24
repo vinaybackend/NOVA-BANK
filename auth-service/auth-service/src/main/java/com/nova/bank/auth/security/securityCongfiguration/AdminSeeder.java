@@ -54,7 +54,7 @@ public class AdminSeeder implements CommandLineRunner {
         User admin = new User();
 
         admin.setEmail(adminEmail);
-        Role role = roleRepository.findByName(RoleConstants.ADMIN).orElseThrow();
+        Role role = roleRepository.findByNameContainingIgnoreCase(RoleConstants.ADMIN).orElseThrow();
 
         // Hash password before saving
         admin.setPassword(passwordEncoder.encode(adminPassword));

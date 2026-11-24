@@ -16,6 +16,8 @@ public class AccountResponse {
 
     private String customerId;
 
+    private String branchCode;
+
     private AccountType accountType;
 
     private AccountStatus accountStatus;
@@ -27,4 +29,6 @@ public class AccountResponse {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+    private String name;
+    private String email;
 }

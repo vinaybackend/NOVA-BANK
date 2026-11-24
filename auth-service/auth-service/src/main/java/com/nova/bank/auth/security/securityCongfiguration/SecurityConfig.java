@@ -12,6 +12,12 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableMethodSecurity// method level security which one access user or admin decide
@@ -37,7 +43,7 @@ public class SecurityConfig {
                                         "/api/v1/auth/refresh-token",
                                         "/api/v1/admin/auth/refresh-token")
                                         .permitAll()
-                                .requestMatchers("/api/v1/admin/auth/**").hasRole("ADMIN")
+                                .requestMatchers("/api/v1/admin/auth/**").hasAnyRole("ADMIN", "BRANCH_MANAGER", "KYC_OFFICER","HR")
                                 .anyRequest().authenticated());
         // manage the session
         httpSecurity.sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
@@ -56,4 +62,6 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
     }
+
+
 }

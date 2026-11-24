@@ -11,21 +11,52 @@
         <module name="config-server" />
         <module name="customer-service" />
         <module name="service-registry" />
+        <module name="loan-service" />
       </profile>
-      <profile name="Annotation profile for auth-service" enabled="true">
+      <profile name="Annotation profile for notification-service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.48/lombok-1.18.48.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.48/lombok-1.18.48.jar" />
+        </processorPath>
+        <module name="notification-service" />
+      </profile>
+      <profile name="Annotation profile for kyc-service" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
-        <module name="account-service" />
+        <module name="kyc-service" />
+      </profile>
+      <profile name="Annotation profile for transaction-service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
         <module name="transaction-service" />
+      </profile>
+      <profile name="Annotation profile for employee-service" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.38/lombok-1.18.38.jar" />
+        </processorPath>
         <module name="auth-service" />
+        <module name="branch-service" />
+        <module name="account-service" />
+        <module name="employee-service" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="kyc-service" target="21" />
+      <module name="notification-service (1) (com.nova)" target="21" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
@@ -33,9 +64,14 @@
       <module name="account-service" options="-parameters" />
       <module name="api-gateway" options="-parameters" />
       <module name="auth-service" options="-parameters" />
+      <module name="branch-service" options="-parameters" />
       <module name="config-server" options="-parameters" />
       <module name="customer-service" options="-parameters" />
+      <module name="employee-service" options="-parameters" />
       <module name="kyc-service" options="-parameters" />
+      <module name="loan-service" options="-parameters" />
+      <module name="notification-service" options="-parameters" />
+      <module name="notification-service (1) (com.nova)" options="-parameters" />
       <module name="service-registry" options="-parameters" />
       <module name="transaction-service" options="-parameters" />
     </option>

@@ -1,13 +1,12 @@
 package com.nova.bank.auth.controllers;
-import com.nova.bank.auth.dto.ErrorResponse;
-import com.nova.bank.auth.dto.JwtResponse;
-import com.nova.bank.auth.dto.LoginRequest;
-import com.nova.bank.auth.dto.UserDto;
+import com.nova.bank.auth.dto.*;
+import com.nova.bank.auth.dto.request.ChangePasswordRequest;
 import com.nova.bank.auth.entites.User;
 import com.nova.bank.auth.exception.ResourceNotFound;
 import com.nova.bank.auth.repositories.UserRepository;
 import com.nova.bank.auth.security.JwtHelper;
 import com.nova.bank.auth.services.UserService;
+import io.jsonwebtoken.JwtException;
 import jakarta.validation.Valid;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
@@ -18,6 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,25 +27,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
-    private AuthenticationManager authenticationManager;
-    private UserDetailsService userDetailsService;
-    private JwtHelper jwtHelper;
-    private UserService userService;
-    private UserRepository userRepository;
-    private ModelMapper modelMapper;
+    private final AuthenticationManager authenticationManager;
+    private final UserDetailsService userDetailsService;
+    private final JwtHelper jwtHelper;
+    private final UserService userService;
+    private final UserRepository userRepository;
+    private final ModelMapper modelMapper;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService, JwtHelper jwtHelper, UserService userService, UserRepository userRepository, ModelMapper modelMapper) {
+    public AuthController(AuthenticationManager authenticationManager, UserDetailsService userDetailsService, JwtHelper jwtHelper, UserService userService, UserRepository userRepository, ModelMapper modelMapper, PasswordEncoder passwordEncoder) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtHelper = jwtHelper;
         this.userService = userService;
         this.userRepository = userRepository;
         this.modelMapper = modelMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(
-            @RequestBody LoginRequest loginRequest ){
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest ){
 
         // generate the token
 
@@ -80,12 +81,10 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@Valid @RequestBody UserDto userDto){
+    public ResponseEntity<String> register(@Valid @RequestBody RegisterRequest request) {
+        userService.registerUser(request);
 
-        userService.registerUser(userDto);
-
-        return new ResponseEntity<>("Register Successfully",HttpStatus.CREATED);
-
+        return new ResponseEntity<>("Register Successfully", HttpStatus.CREATED);
     }
 
 
@@ -93,30 +92,57 @@ public class AuthController {
     public ResponseEntity<?> refreshToken(@RequestBody(required = false) String refreshToken ){
 
         if (refreshToken==null){
-            return new ResponseEntity<>(new ErrorResponse("refresh token is null",400,false),HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new ErrorResponse("Refresh token is required.",400,false),HttpStatus.BAD_REQUEST);
         }
 
-        if (!jwtHelper.isRefreshToken(refreshToken)){
-            return new ResponseEntity<>(new ErrorResponse("Refresh token is invalid ",400,false),HttpStatus.BAD_REQUEST);
+        try {
+            if (!jwtHelper.isRefreshToken(refreshToken)){
+                return new ResponseEntity<>(new ErrorResponse("Refresh token is invalid or expired.",401,false),HttpStatus.UNAUTHORIZED);
+            }
+
+            String usernameFromToken = jwtHelper.getUsernameFromToken(refreshToken);
+            UserDetails userDetails = userDetailsService.loadUserByUsername(usernameFromToken);
+
+            if (jwtHelper.isTokenValid(refreshToken,userDetails)){
+
+                String accessToken = jwtHelper.generateAccessToken(userDetails);
+                String newRefreshToken1 = jwtHelper.generateRefreshToken(userDetails);
+                User user = userRepository.findByEmail(usernameFromToken).orElseThrow(() -> new ResourceNotFound("username not found "));
+
+                UserDto userDto = modelMapper.map(user, UserDto.class);
+
+                return new ResponseEntity<>(new JwtResponse(accessToken,newRefreshToken1,userDto),HttpStatus.OK);
+
+
+            }else {
+                return new ResponseEntity<>(new ErrorResponse("Refresh token is invalid or expired.",401,false),HttpStatus.UNAUTHORIZED);
+            }
+        } catch (JwtException | IllegalArgumentException exception) {
+            return new ResponseEntity<>(new ErrorResponse("Refresh token is invalid or expired.",401,false),HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            java.security.Principal principal) { // Gets the logged-in user's email
+
+        User user = userRepository.findByEmail(principal.getName())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        // 1. Verify old password
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            return new ResponseEntity<>(
+                    new ErrorResponse("Incorrect current password", 400, false),
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
-        String usernameFromToken = jwtHelper.getUsernameFromToken(refreshToken);
-        UserDetails userDetails = userDetailsService.loadUserByUsername(usernameFromToken);
+        // 2. Encode and save new password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
 
-        if (jwtHelper.isTokenValid(refreshToken,userDetails)){
-
-            String accessToken = jwtHelper.generateAccessToken(userDetails);
-            String newRefreshToken1 = jwtHelper.generateRefreshToken(userDetails);
-            User user = userRepository.findByEmail(usernameFromToken).orElseThrow(() -> new ResourceNotFound("username not found "));
-
-            UserDto userDto = modelMapper.map(user, UserDto.class);
-
-            return new ResponseEntity<>(new JwtResponse(accessToken,newRefreshToken1,userDto),HttpStatus.OK);
-
-
-        }else {
-            return new ResponseEntity<>(new ErrorResponse("token is invalid ",400,false),HttpStatus.BAD_REQUEST);
-        }
+        return new ResponseEntity<>("Password changed successfully", HttpStatus.OK);
     }
 
 }

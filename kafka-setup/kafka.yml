@@ -1,0 +1,41 @@
+
+services:
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: nova-kafka
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://nova-kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - nova-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: nova-kafka-ui
+    ports:
+      - "7575:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: Nova-Bank
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: nova-kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - nova-network
+
+volumes:
+  kafka_data:
+
+networks:
+  nova-network:
+    driver: bridge

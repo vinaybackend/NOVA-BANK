@@ -1,6 +1,6 @@
 package com.nova.bank.account.dto;
 
-import com.nova.bank.account.entities.BranchStatus;
+import com.nova.bank.account.clients.branch.BranchStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @Builder
 public class BranchResponse {
 
-    private String branchId;
     private String branchCode;
     private String branchName;
     private String ifsc;
@@ -19,7 +18,7 @@ public class BranchResponse {
     private String city;
     private String state;
     private String country;
-    private String postalCode;
+    private String pinCode;
 
     private BranchStatus status;
 

@@ -19,10 +19,14 @@ public class UserDto {
     private String name;
     @Email
     private String email;
-    @NotBlank(message = "password required min 5 (character and digit.")
-    private String password;
+
     @NotBlank(message = "mobile number required ")
     @Size(min = 10,max = 10,message = "10 digit required")
     private String phone;
+
+    private String branchCode;
+    private String branchName;
+    private String ifsc;
     private LocalDateTime createAt;
+
 }

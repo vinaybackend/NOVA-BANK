@@ -4,21 +4,17 @@ import com.nova.bank.entities.EmploymentType;
 import com.nova.bank.entities.MaritalStatus;
 import com.nova.bank.entities.SourceOfIncome;
 import com.nova.bank.entities.Title;
+import com.nova.bank.client.AccountType;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record UpdateCustomerRequest(
 
         Title title,
 
         @Size(max = 50, message = "First name must not exceed 50 characters")
-        String firstName,
-
-        @Size(max = 50, message = "Middle name must not exceed 50 characters")
-        String middleName,
-
-        @Size(max = 50, message = "Last name must not exceed 50 characters")
-        String lastName,
+        String name,
 
         @Size(max = 100, message = "Nationality must not exceed 100 characters")
         String nationality,
@@ -30,13 +26,13 @@ public record UpdateCustomerRequest(
         String email,
 
         @Pattern(
-                regexp = "^[0-9]{10,15}$",
+                regexp = "^[0-9]{10}$",
                 message = "Mobile number must contain 10 to 15 digits"
         )
         String mobileNumber,
 
         @Pattern(
-                regexp = "^[0-9]{10,15}$",
+                regexp = "^[0-9]{10}$",
                 message = "Alternate mobile number must contain 10 to 15 digits"
         )
         String alternateMobileNumber,
@@ -92,6 +88,14 @@ public record UpdateCustomerRequest(
         SourceOfIncome sourceOfIncome,
 
         @Size(max = 30, message = "Language must not exceed 30 characters")
-        String language
+        String language,
+
+        AccountType accountType,
+
+        @Past(message = "Date of birth must be in the past")
+        LocalDate dateOfBirth,
+
+        @Size(min = 3, max = 3, message = "Currency must be a 3-letter code")
+        String currency
 ) {
 }

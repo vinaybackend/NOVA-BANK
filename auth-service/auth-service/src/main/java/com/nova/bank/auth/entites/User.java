@@ -26,6 +26,9 @@ public class User {
     private String password;
     @Column(unique = true)
     private String phone;
+    private String branchCode;
+    private String branchName;
+    private String ifsc;
     private LocalDateTime createAt;
     @ManyToMany(fetch = FetchType.EAGER)
     List<Role> roles = new ArrayList<>();

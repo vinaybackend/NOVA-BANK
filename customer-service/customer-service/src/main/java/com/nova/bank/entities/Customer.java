@@ -1,9 +1,7 @@
     package com.nova.bank.entities;
     import com.nova.bank.client.AccountType;
     import jakarta.persistence.*;
-    import jakarta.validation.constraints.NotBlank;
     import lombok.*;
-
     import java.math.BigDecimal;
     import java.time.LocalDate;
     import java.time.LocalDateTime;
@@ -33,14 +31,8 @@
     @Column(name = "title", length = 10)
     private Title title;
 
-    @Column(name = "first_name", nullable = false, length = 50)
-    private String firstName;
-
-    @Column(name = "middle_name", length = 50)
-    private String middleName;
-
-    @Column(name = "last_name", nullable = false, length = 50)
-    private String lastName;
+    @Column(name = "name", nullable = false, length = 50)
+    private String name;
 
     @Column(name = "date_of_birth", nullable = false)
     private LocalDate dateOfBirth;
@@ -61,6 +53,14 @@
 
     @Column(name = "mobile_number", length = 15)
     private String mobileNumber;
+
+    private String branchName;
+
+    private String ifscCode;
+
+    private String branchCode;
+
+    private BigDecimal openingBalance;
 
     @Column(name = "alternate_mobile_number", length = 15)
     private String alternateMobileNumber;
@@ -122,6 +122,9 @@
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
 
     @Version
     @Column(name = "version", nullable = false)

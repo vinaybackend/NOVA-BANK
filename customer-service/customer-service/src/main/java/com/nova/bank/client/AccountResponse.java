@@ -18,7 +18,7 @@ public class AccountResponse {
     private AccountStatus accountStatus;
     private BigDecimal balance;
     private String currency;
-    private String branchId;
+    private String branchCode;
     private String branchName;
     private String ifsc;
     private LocalDateTime createdAt;

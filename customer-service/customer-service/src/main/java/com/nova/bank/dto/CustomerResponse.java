@@ -16,11 +16,13 @@ public class CustomerResponse {
 
     private Title title;
 
-    private String firstName;
+    private String name;
 
-    private String middleName;
+    private String branchName;
 
-    private String lastName;
+    private String branchCode;
+
+    private String ifscCode;
 
     private LocalDate dateOfBirth;
 
@@ -69,5 +71,8 @@ public class CustomerResponse {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
-    private KycResponse kycResponse;
+
+    private BigDecimal openingBalance;
+    private String profileImageUrl;
+
 }

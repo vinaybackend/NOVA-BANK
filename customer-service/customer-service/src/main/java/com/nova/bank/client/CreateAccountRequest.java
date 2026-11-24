@@ -23,6 +23,9 @@ public class CreateAccountRequest {
     @Size(min = 3, max = 3, message = "Currency must be a 3-letter code")
     private String currency;
 
-    private String branchId;
+    private String branchCode;
+    private String email;
+    private String name;
+    private String mobileNumber;
 
 }
