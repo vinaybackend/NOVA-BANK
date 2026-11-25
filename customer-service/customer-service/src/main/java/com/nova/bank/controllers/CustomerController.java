@@ -146,8 +146,8 @@ public class CustomerController {
 
     @PreAuthorize("hasRole('CUSTOMER')")
     @PutMapping("/update-customer-profile")
-    public ResponseEntity<CustomerResponse> updateCustomerProfile(@RequestBody CustomerUpdatedRequest request, Authentication authentication) {
-      CustomerResponse customerUpdate = customerService.updateCustomerProfile(request, authentication);
+    public ResponseEntity<CustomerResponse> updateCustomerProfile(@Valid @RequestBody CustomerUpdatedRequest request, Authentication authentication) {
+        CustomerResponse customerUpdate = customerService.updateCustomerProfile(request, authentication);
         return ResponseEntity.ok(customerUpdate);
     }
 

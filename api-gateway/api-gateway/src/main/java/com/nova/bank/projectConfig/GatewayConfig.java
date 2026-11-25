@@ -1,9 +1,12 @@
 package com.nova.bank.projectConfig;
 
+import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
+import org.springframework.cloud.gateway.filter.ratelimit.RedisRateLimiter;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 
@@ -15,8 +18,10 @@ public class GatewayConfig {
 
         return routeLocatorBuilder.routes()
 
-                .route("auth-service", route -> route.path("/auth-service/**").filters(f -> f.rewritePath("/auth-service/(?<remaining>.*)", "/${remaining}")
-                         .retry(retryConfig -> retryConfig.setRetries(3).setBackoff(Duration.ofMillis(50),Duration.ofMillis(600),2,true)))
+                .route("auth-service", route -> route.path("/auth-service/**").
+                        filters(f -> f.rewritePath("/auth-service/(?<remaining>.*)", "/${remaining}")
+                         .retry(retryConfig -> retryConfig.setRetries(3).setBackoff(Duration.ofMillis(50),Duration.ofMillis(600),2,true))
+                                .requestRateLimiter(c->c.setRateLimiter(redisRateLimiter()).setKeyResolver(keyResolver())))
                         .uri("lb://AUTH-SERVICE"))
 
                 .route("customer-service", route -> route.path("/customer-service/**").filters(f -> f.rewritePath("/customer-service/(?<remaining>.*)", "/${remaining}").circuitBreaker(c->c.setName("customerServiceCircuitBreaker").setFallbackUri("forward:/fallback"))).uri("lb://CUSTOMER-SERVICE"))
@@ -35,5 +40,15 @@ public class GatewayConfig {
                 .route("loan-service", route -> route.path("/loan-service/**").filters(f -> f.rewritePath("/loan-service/(?<remaining>.*)", "/${remaining}")).uri("lb://LOAN-SERVICE"))
 
                 .build();
+    }
+
+    @Bean
+    public KeyResolver keyResolver(){
+        return exchange -> Mono.just(exchange.getRequest().getHeaders().getHost().getHostName());
+    }
+
+    @Bean
+    public RedisRateLimiter redisRateLimiter(){
+        return new RedisRateLimiter(2,2);
     }
 }

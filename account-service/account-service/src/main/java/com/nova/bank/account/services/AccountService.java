@@ -539,30 +539,21 @@ public class AccountService {
     @Transactional
     public CustomerTransferResponse transferForCurrentCustomer(CustomerTransferRequest request) {
         if (request.getFromAccountNumber().equals(request.getToAccountNumber())) {
-            throw new IllegalArgumentException("Source and destination accounts cannot be the same");
+            throw new AccountAlreadyExistsException("Source and destination accounts cannot be the same");
         }
         validateAmount(request.getAmount());
 
-        CustomerProfileResponse customer = customerClient.getMyProfile();
-        String firstAccountNumber = request.getFromAccountNumber().compareTo(request.getToAccountNumber()) < 0
-                ? request.getFromAccountNumber() : request.getToAccountNumber();
-        String secondAccountNumber = firstAccountNumber.equals(request.getFromAccountNumber())
-                ? request.getToAccountNumber() : request.getFromAccountNumber();
-        Account firstLocked = accountRepository.findByAccountNumberForUpdate(firstAccountNumber)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found"));
-        Account secondLocked = accountRepository.findByAccountNumberForUpdate(secondAccountNumber)
-                .orElseThrow(() -> new AccountNotFoundException("Account not found"));
+        String firstAccountNumber = request.getFromAccountNumber().compareTo(request.getToAccountNumber()) < 0 ? request.getFromAccountNumber() : request.getToAccountNumber();
+        String secondAccountNumber = firstAccountNumber.equals(request.getFromAccountNumber()) ? request.getToAccountNumber() : request.getFromAccountNumber();
+        Account firstLocked = accountRepository.findByAccountNumberForUpdate(firstAccountNumber).orElseThrow(() -> new AccountNotFoundException("Account not found"));
+        Account secondLocked = accountRepository.findByAccountNumberForUpdate(secondAccountNumber).orElseThrow(() -> new AccountNotFoundException("Account not found"));
         Account source = firstLocked.getAccountNumber().equals(request.getFromAccountNumber()) ? firstLocked : secondLocked;
         Account destination = firstLocked.getAccountNumber().equals(request.getToAccountNumber()) ? firstLocked : secondLocked;
 
-        if (!source.getCustomerId().equals(customer.getCustomerId())) {
-            throw new IllegalArgumentException("The source account does not belong to the signed-in customer");
-        }
         validateAccountForTransaction(source);
         validateAccountForTransaction(destination);
-        if (!source.getCurrency().equalsIgnoreCase(destination.getCurrency())
-                || !source.getCurrency().equalsIgnoreCase(request.getCurrency())) {
-            throw new IllegalArgumentException("Source, destination and transfer currencies must match");
+        if (!source.getCurrency().equalsIgnoreCase(destination.getCurrency()) || !source.getCurrency().equalsIgnoreCase(request.getCurrency())) {
+            throw new AccountAlreadyExistsException("Source, destination and transfer currencies must match");
         }
         if (source.getBalance().compareTo(request.getAmount()) < 0) {
             throw new InsufficientBalanceException("Insufficient balance");
@@ -576,7 +567,7 @@ public class AccountService {
         accountRepository.save(destination);
 
         return new CustomerTransferResponse(
-                customer.getCustomerId(),
+                source.getCustomerId(),
                 source.getAccountNumber(),
                 destination.getAccountNumber(),
                 source.getCurrency());
@@ -587,15 +578,15 @@ public class AccountService {
     private void validateAmount(BigDecimal amount) {
 
         if (amount == null) {
-            throw new IllegalArgumentException("Amount is required");
+            throw new AccountAlreadyExistsException("Amount is required");
         }
 
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than zero");
+            throw new AccountAlreadyExistsException("Amount must be greater than zero");
         }
 
         if (amount.scale() > 2) {
-            throw new IllegalArgumentException("Amount cannot have more than 2 decimal places");
+            throw new AccountAlreadyExistsException("Amount cannot have more than 2 decimal places");
         }
     }
 
@@ -614,7 +605,7 @@ public class AccountService {
 
         if (account.getAccountStatus() != AccountStatus.ACTIVE) {
 
-            throw new IllegalStateException("Account is not active");
+            throw new AccountAlreadyExistsException("Account is not active");
         }
     }
 

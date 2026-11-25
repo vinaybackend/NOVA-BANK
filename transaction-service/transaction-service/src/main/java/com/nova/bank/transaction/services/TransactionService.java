@@ -243,13 +243,13 @@ public class TransactionService {
     }
 
     public TransferTransactionResponse transferForCurrentCustomer(CreateTransferRequest request) {
-        CustomerProfileResponse customer = customerClient.getMyProfile();
+        AccountResponse accountByNumber = accountClient.getAccountByNumber(request.getToAccountNumber());
         LocalDateTime now = LocalDateTime.now();
         Transaction transaction = Transaction.builder()
                 .transactionId(generateTransactionId())
                 .fromAccountNumber(request.getFromAccountNumber())
                 .toAccountNumber(request.getToAccountNumber())
-                .customerId(customer.getCustomerId())
+                .customerId(accountByNumber.getCustomerId())
                 .transactionType(TransactionType.TRANSFER)
                 .amount(request.getAmount())
                 .currency(request.getCurrency())
@@ -263,7 +263,7 @@ public class TransactionService {
         //for credit
 
         // find destinatio account
-        AccountResponse accountByNumber = accountClient.getAccountByNumber(request.getToAccountNumber());
+
 
         transactionRepository.saveAndFlush(transaction);
 
@@ -315,7 +315,7 @@ public class TransactionService {
         transactionEvent.setAmount(success.getAmount());
         transactionEvent.setCurrency(success.getCurrency());
         transactionEvent.setDescription(success.getDescription());
-        transactionEvent.setCustomerName(customer.getName());
+        transactionEvent.setCustomerName(accountByNumber.getName());
         transactionEvent.setTransactionId(success.getTransactionId());
         transactionEvent.setTransactionStatus(success.getTransactionStatus().toString());
         transactionEvent.setTransactionType(success.getTransactionType().toString());
@@ -323,7 +323,7 @@ public class TransactionService {
         transactionEvent.setReference(success.getReference());
         transactionEvent.setToAccountNumber(success.getToAccountNumber());
         transactionEvent.setFromAccountNumber(success.getFromAccountNumber());
-        transactionEvent.setEmail(customer.getEmail());
+        transactionEvent.setEmail(accountByNumber.getEmail());
 
         transactionEventPublisher.publishTransactionCreatedEvent(transactionEvent);
         // wrote for mails

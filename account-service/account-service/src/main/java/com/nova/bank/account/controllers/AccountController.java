@@ -87,8 +87,7 @@ public class AccountController {
 
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN','BRANCH_MANAGER')")
     @PostMapping("/customer-transfer")
-    public ResponseEntity<CustomerTransferResponse> transferForCurrentCustomer(
-            @Valid @RequestBody CustomerTransferRequest request) {
+    public ResponseEntity<CustomerTransferResponse> transferForCurrentCustomer(@Valid @RequestBody CustomerTransferRequest request) {
         return ResponseEntity.ok(accountService.transferForCurrentCustomer(request));
     }
 
